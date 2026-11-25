@@ -8,6 +8,9 @@
 # Code: /tmp/smprd-src.tgz
 set -euo pipefail
 
+# Manual use on the VPS (no GitHub secret needed):
+#   curl -fsSL -o /tmp/smprd-deploy.sh https://raw.githubusercontent.com/firekidu/app_test_tracker/claude/relaxed-einstein-1xpirl/deploy/remote-deploy.sh && VPS_IP=57.131.28.237 bash /tmp/smprd-deploy.sh
+
 ENV_IN=/tmp/smprd-deploy.env
 SRC_TGZ=/tmp/smprd-src.tgz
 BASE=/opt/smprd
@@ -22,7 +25,7 @@ as_root() {
   if [ "$(id -u)" = 0 ]; then "$@"
   elif sudo -n true 2>/dev/null; then sudo "$@"
   elif [ -n "${SUDO_PASSWORD:-}" ]; then printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' "$@"
-  else echo "ERROR: sudo needs a password; add the VPS_PASSWORD secret." >&2; exit 1
+  else sudo "$@"   # interactive run: sudo asks for the password
   fi
 }
 
@@ -70,7 +73,16 @@ log "Unpacking the new release"
 as_root mkdir -p "$BASE"
 as_root rm -rf "$BASE/src.new"
 as_root mkdir -p "$BASE/src.new"
-as_root tar -xzf "$SRC_TGZ" -C "$BASE/src.new"
+if [ ! -f "$SRC_TGZ" ]; then
+  # Manual run on the server: fetch the latest code of the branch from GitHub.
+  BRANCH="${BRANCH:-claude/relaxed-einstein-1xpirl}"
+  log "Downloading $BRANCH from GitHub"
+  curl -fsSL -o "$SRC_TGZ" "https://codeload.github.com/firekidu/app_test_tracker/tar.gz/refs/heads/$BRANCH"
+fi
+# GitHub's own archives wrap everything in one top-level folder; strip it when there is no Dockerfile at the root.
+STRIP=0
+if ! tar -tzf "$SRC_TGZ" | grep -qx 'Dockerfile'; then STRIP=1; fi
+as_root tar -xzf "$SRC_TGZ" -C "$BASE/src.new" --strip-components="$STRIP"
 rm -f "$SRC_TGZ"
 
 # ---------- 6. Settings (/opt/smprd/.env, kept between deploys, root-only) ----------
