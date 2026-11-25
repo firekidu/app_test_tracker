@@ -25,7 +25,7 @@ DEMO_SHEET_CSV=tests/fixtures/sheet-2026-11-24.csv INITIAL_ADMIN_PASSWORD='a tem
 
 Sign in as `admin` (or `INITIAL_ADMIN_USERNAME`) with that password; you'll be asked to choose a new one.
 
-Checks: `npm run lint && npm test` (Vitest unit tests for mapping, stats, row identity, password policy, lock-out, names, upload maths).
+Checks: `npm run lint && npm test` (Vitest unit tests for mapping, stats, row identity, password policy, lock-out, names, upload maths) and `npm run build && npm run test:e2e` (Playwright, BUILD.md §15.3 in demo mode: forced password change, new editor, + Add name, Completed → End date, HEIC/HEVC uploads and seeking, wrong type rejected, delete, phone layout, lock-out). Both run in CI before every deploy.
 
 ## Deploy (GitHub Actions → VPS)
 
@@ -68,4 +68,4 @@ sudo nano /opt/smprd/.env && cd /opt/smprd/src && sudo docker compose up -d   # 
 sudo docker exec -it smprd-app-1 node scripts/reset-admin.mjs david             # locked-out admin
 ```
 
-Back up the `smprd_smprd-data` Docker volume (accounts, encrypted Google token) and keep `/opt/smprd/.env` in a password manager.
+A daily backup (03:17) of the database and encrypted Google token is written to `/opt/smprd/backups` (14 days kept). Copy that folder off the server from time to time (for example to OVH Object Storage), and keep `/opt/smprd/.env` in a password manager.

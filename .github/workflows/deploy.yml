@@ -25,6 +25,11 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - name: End-to-end tests (demo mode, no Google)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+          npm run test:e2e
 
   docker:
     runs-on: ubuntu-latest

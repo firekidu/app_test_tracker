@@ -162,5 +162,12 @@ $DOCKER exec smprd-app-1 node -e "fetch('http://127.0.0.1:3000/api/health').then
 log "Recent proxy log (certificate status)"
 $DOCKER compose logs --tail 15 caddy | grep -iE "certificate|obtain|error" || true
 
+# ---------- 9. Daily backup (03:17) → /opt/smprd/backups ----------
+as_root mkdir -p "$BASE/backups"
+as_root chmod 700 "$BASE/backups"
+echo '17 3 * * * root docker exec smprd-app-1 node scripts/backup.mjs >/dev/null 2>&1 && docker cp smprd-app-1:/data/backups/. /opt/smprd/backups/ && find /opt/smprd/backups -type f -mtime +14 -delete' | as_root tee /etc/cron.d/smprd-backup >/dev/null
+as_root chmod 644 /etc/cron.d/smprd-backup
+$DOCKER exec smprd-app-1 node scripts/backup.mjs && $DOCKER cp smprd-app-1:/data/backups/. "$BASE/backups/" >/dev/null && echo "Backup OK: $(as_root ls "$BASE/backups" | tail -1)"
+
 $DOCKER image prune -f >/dev/null 2>&1 || true
 log "Deployed: https://$APP_DOMAIN"

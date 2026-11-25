@@ -1,5 +1,5 @@
 import { json, withUser } from '@/lib/api';
-import { mediaForRowKey } from '@/lib/media-jobs';
+import { mediaForRowKey, scanRowFolder } from '@/lib/media-jobs';
 import { HttpError, snapshot } from '@/lib/sheet-store';
 
 export const runtime = 'nodejs';
@@ -12,6 +12,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ n: string }> })
     const row = snap.rows.find((r) => (key ? r.rowKey === key : r.rowNumber === n));
     if (!row) throw new HttpError(404, 'Row not found.');
     const list = mediaForRowKey(row.rowKey);
-    return json(list.length ? list : row.media);
+    if (list.length) return json(list);
+    // Nothing indexed locally but column K links a folder: rebuild this row from Drive (BUILD.md 7.3).
+    if (row.mediaFolderUrl) return json(await scanRowFolder(row.rowKey, row.mediaFolderUrl).catch(() => row.media));
+    return json(row.media);
   });
 }

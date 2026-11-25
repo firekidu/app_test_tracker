@@ -292,9 +292,7 @@ export async function setCaption(m: MediaRecord, caption: string, actorName: str
   await logMediaChange(m.row_key, 'Caption', m.caption ?? '', c, { name: actorName }, m.name);
 }
 
-/** Re-scan the Drive folders linked in column K and rebuild the media table. */
-export async function rebuildMediaIndex(): Promise<{ files: number; rows: number }> {
-  const snap = await snapshot();
+async function derivativeMap(): Promise<Map<string, Record<string, string>>> {
   const previewsId = getSetting('drivePreviewsFolderId');
   const derivs = new Map<string, Record<string, string>>();
   if (previewsId) {
@@ -304,36 +302,58 @@ export async function rebuildMediaIndex(): Promise<{ files: number; rows: number
       derivs.set(from, { ...(derivs.get(from) ?? {}), [f.appProperties.role ?? 'thumb']: f.id });
     }
   }
+  return derivs;
+}
+
+/** Index the app-created files in one row folder. Returns the Drive ids found. */
+async function indexFolder(fid: string, rowKey: string, derivs: Map<string, Record<string, string>>): Promise<string[]> {
+  const list = await drive().listChildren(fid);
+  const originals = list.filter((f) => f.appProperties.app === 'smprd' && !f.appProperties.derivedFrom);
+  for (const f of originals) {
+    const dv = derivs.get(f.id) ?? {};
+    const kind = f.appProperties.kind === 'video' || f.mimeType.startsWith('video/') ? 'video' : 'photo';
+    const uploader = f.appProperties.uploader ?? null;
+    db()
+      .prepare(
+        `INSERT INTO media(file_id, folder_id, row_key, name, mime_type, kind, size, caption, uploader_username, uploader_name, created_at, thumb_file_id, display_file_id, preview_file_id, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready')
+         ON CONFLICT(file_id) DO UPDATE SET folder_id = excluded.folder_id, row_key = excluded.row_key, name = excluded.name, caption = excluded.caption,
+           thumb_file_id = COALESCE(excluded.thumb_file_id, media.thumb_file_id), display_file_id = COALESCE(excluded.display_file_id, media.display_file_id),
+           preview_file_id = COALESCE(excluded.preview_file_id, media.preview_file_id), status = 'ready'`,
+      )
+      .run(f.id, fid, rowKey, f.name, f.mimeType, kind, f.size, f.description, uploader, uploader ? uploaderNameOf(uploader) : null, f.createdTime, dv.thumb ?? null, dv.display ?? null, dv.preview ?? null);
+  }
+  return originals.map((f) => f.id);
+}
+
+/** Used when a row's media list is empty locally but column K links a folder (e.g. after /data was lost). */
+export async function scanRowFolder(rowKey: string, folderUrl: string) {
+  const fid = folderIdFromUrl(folderUrl);
+  if (!fid) return [];
+  const ids = await indexFolder(fid, rowKey, await derivativeMap());
+  if (ids.length) touchMedia();
+  return mediaForRowKey(rowKey);
+}
+
+/** Re-scan the Drive folders linked in column K and rebuild the media table. */
+export async function rebuildMediaIndex(): Promise<{ files: number; rows: number }> {
+  const snap = await snapshot();
+  const derivs = await derivativeMap();
   let files = 0;
   let rows = 0;
   const seen = new Set<string>();
   for (const r of snap.rows) {
     const fid = folderIdFromUrl(r.mediaFolderUrl);
     if (!fid) continue;
-    let list;
+    let ids: string[];
     try {
-      list = await drive().listChildren(fid);
+      ids = await indexFolder(fid, r.rowKey, derivs);
     } catch {
       continue;
     }
-    const originals = list.filter((f) => f.appProperties.app === 'smprd' && !f.appProperties.derivedFrom);
-    if (originals.length) rows++;
-    for (const f of originals) {
-      seen.add(f.id);
-      files++;
-      const dv = derivs.get(f.id) ?? {};
-      const kind = f.appProperties.kind === 'video' || f.mimeType.startsWith('video/') ? 'video' : 'photo';
-      const uploader = f.appProperties.uploader ?? null;
-      db()
-        .prepare(
-          `INSERT INTO media(file_id, folder_id, row_key, name, mime_type, kind, size, caption, uploader_username, uploader_name, created_at, thumb_file_id, display_file_id, preview_file_id, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready')
-           ON CONFLICT(file_id) DO UPDATE SET folder_id = excluded.folder_id, row_key = excluded.row_key, name = excluded.name, caption = excluded.caption,
-             thumb_file_id = COALESCE(excluded.thumb_file_id, media.thumb_file_id), display_file_id = COALESCE(excluded.display_file_id, media.display_file_id),
-             preview_file_id = COALESCE(excluded.preview_file_id, media.preview_file_id), status = 'ready'`,
-        )
-        .run(f.id, fid, r.rowKey, f.name, f.mimeType, kind, f.size, f.description, uploader, uploader ? uploaderNameOf(uploader) : null, f.createdTime, dv.thumb ?? null, dv.display ?? null, dv.preview ?? null);
-    }
+    if (ids.length) rows++;
+    files += ids.length;
+    ids.forEach((id) => seen.add(id));
   }
   // Remove entries whose files are gone
   const all = db().prepare('SELECT file_id FROM media').all() as { file_id: string }[];
