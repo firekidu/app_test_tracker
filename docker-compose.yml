@@ -1,0 +1,38 @@
+# Production stack for one VPS: the app + Caddy (automatic HTTPS with Let's Encrypt).
+# Deployed by .github/workflows/deploy.yml → deploy/remote-deploy.sh.
+name: smprd
+
+services:
+  app:
+    build: .
+    image: smprd-tracker:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+    volumes:
+      - smprd-data:/data
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      VPS_IP: ${VPS_IP:-127.0.0.1}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  smprd-data:
+  caddy-data:
+  caddy-config:

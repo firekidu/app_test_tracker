@@ -1,0 +1,87 @@
+Bugs,Priority,Reported By,Status,Reported Date,End date,Milestone,Bug Owner,Deliverable,Notes
+Login: button does not respond (case 1),Medium,David Thomas,Completed,02/02/2026,08/02/2026,M1,gautham@example.com,App,Checked on build 100
+Checkout: validation message unclear (case 2),Low,david@example.com,Completed,02/02/2026,05/02/2026,M1,renjith@example.com,Web,
+Search: crashes when tapped twice (case 3),Medium,Renjith R,Completed,03/02/2026,12/02/2026,M1,RENJITH R,App,
+Profile: layout breaks on small screens (case 4),Low,RENJITH R,Completed,04/02/2026,05/02/2026,M1,David Thomas,Web,Checked on build 103
+Seller onboarding: toast window overlaps header (case 5),Low,renjith@example.com,Feature existing,04/02/2026,,M1,,App,
+Try-on: image not loading (case 6),Medium,gautham@example.com,Completed,05/02/2026,13/02/2026,M1,gautham@example.com,Web,
+Share link: wrong text shown (case 7),Medium,David Thomas,Feature is Coming soon,06/02/2026,,M1,renjith@example.com,App,Checked on build 106
+Wishlist: pop up window stays open (case 8),Medium,david@example.com,Completed,07/02/2026,16/02/2026,M1,RENJITH R,Web,
+Cart: missing translation (case 9),Medium,Renjith R,Feature is Coming soon,07/02/2026,,M1,David Thomas,App,
+Payments: slow to load (case 10),Medium,RENJITH R,Completed,08/02/2026,15/02/2026,M1,,Web,Checked on build 109
+Notifications: button does not respond (case 11),Medium,renjith@example.com,Completed,09/02/2026,16/02/2026,M1,gautham@example.com,App,
+Reviews: validation message unclear (case 12),Low,gautham@example.com,Completed,10/02/2026,17/02/2026,M1,renjith@example.com,Web,
+Filters: crashes when tapped twice (case 13),Medium,David Thomas,Completed,10/02/2026,17/02/2026,M1,RENJITH R,App,Checked on build 112
+Orders: layout breaks on small screens (case 14),High,david@example.com,Completed,11/02/2026,13/02/2026,M1,David Thomas,Web,
+Returns: toast window overlaps header (case 15),Medium,Renjith R,Completed,12/02/2026,20/02/2026,M1,,App,
+Coupons: image not loading (case 16),High,RENJITH R,Completed,13/02/2026,20/02/2026,M1,gautham@example.com,Web,Checked on build 115
+Banner: wrong text shown (case 17),Medium,renjith@example.com,Completed,13/02/2026,14/02/2026,M1,renjith@example.com,App,
+Chat: pop up window stays open (case 18),Medium,gautham@example.com,Feature existing,14/02/2026,,M1,RENJITH R,Web,
+Address: missing translation (case 19),Medium,David Thomas,Completed,15/02/2026,19/02/2026,M1,David Thomas,App,Checked on build 118
+Delivery: slow to load (case 20),Medium,david@example.com,Feature not needed,15/02/2026,,M1,,Web,
+Login: button does not respond (case 21),Medium,Renjith R,Completed,16/02/2026,18/02/2026,M1,gautham@example.com,App,
+Checkout: validation message unclear (case 22),Medium,RENJITH R,Completed,17/02/2026,21/02/2026,M1,renjith@example.com,Web,Checked on build 121
+Search: crashes when tapped twice (case 23),Low,renjith@example.com,Completed,18/02/2026,26/02/2026,M1,RENJITH R,App,
+Profile: layout breaks on small screens (case 24),Low,gautham@example.com,Completed,18/02/2026,21/02/2026,M1,David Thomas,Web,
+Seller onboarding: toast window overlaps header (case 25),Medium,David Thomas,Feature existing,19/02/2026,,M1,,App,Checked on build 124
+Try-on: image not loading (case 26),Low,david@example.com,Completed,20/02/2026,22/02/2026,M1,gautham@example.com,Web,
+Share link: wrong text shown (case 27),Low,Renjith R,Completed,21/02/2026,27/02/2026,M1,renjith@example.com,App,
+Wishlist: pop up window stays open (case 28),Low,RENJITH R,Completed,21/02/2026,22/02/2026,M1,RENJITH R,Web,Checked on build 127
+Cart: missing translation (case 29),Medium,renjith@example.com,Completed,22/02/2026,24/02/2026,M1,David Thomas,App,
+Payments: slow to load (case 30),Low,gautham@example.com,Feature is Coming soon,23/02/2026,,M1,,Web,
+Notifications: button does not respond (case 31),Medium,David Thomas,Completed,24/02/2026,25/02/2026,M1,gautham@example.com,App,Checked on build 130
+Reviews: validation message unclear (case 32),Medium,david@example.com,Completed,24/02/2026,27/02/2026,M1,renjith@example.com,Web,
+Filters: crashes when tapped twice (case 33),Medium,Renjith R,Completed,25/02/2026,06/03/2026,M1,RENJITH R,App,
+Orders: layout breaks on small screens (case 34),Low,RENJITH R,Completed,26/02/2026,28/02/2026,M1,David Thomas,Web,Checked on build 133
+Returns: toast window overlaps header (case 35),Medium,renjith@example.com,TBD,26/02/2026,,M1,,App,
+Coupons: image not loading (case 36),Medium,gautham@example.com,Feature existing,27/02/2026,,M1,gautham@example.com,Web,
+Banner: wrong text shown (case 37),Medium,David Thomas,Completed,28/02/2026,06/03/2026,M1,renjith@example.com,App,Checked on build 136
+Chat: pop up window stays open (case 38),Low,david@example.com,Completed,01/03/2026,02/03/2026,M1,RENJITH R,Web,
+Address: missing translation (case 39),Low,Renjith R,Completed,01/03/2026,03/03/2026,M1,David Thomas,App,
+Delivery: slow to load (case 40),Medium,RENJITH R,Completed,02/03/2026,06/03/2026,M1,,Web,Checked on build 139
+Login: button does not respond (case 41),Medium,renjith@example.com,Completed,03/03/2026,10/03/2026,M2,gautham@example.com,App,
+Checkout: validation message unclear (case 42),Low,gautham@example.com,Completed,04/03/2026,07/03/2026,M2,renjith@example.com,Web,
+Search: crashes when tapped twice (case 43),Medium,David Thomas,Completed,04/03/2026,09/03/2026,M2,RENJITH R,App,Checked on build 142
+Profile: layout breaks on small screens (case 44),Medium,david@example.com,Feature existing,05/03/2026,,M2,David Thomas,Web,
+Seller onboarding: toast window overlaps header (case 45),Medium,Renjith R,Completed,06/03/2026,12/03/2026,M2,,App,
+Try-on: image not loading (case 46),Medium,RENJITH R,Completed,07/03/2026,13/03/2026,M2,gautham@example.com,Web,Checked on build 145
+Share link: wrong text shown (case 47),Low,renjith@example.com,Completed,07/03/2026,15/03/2026,M2,renjith@example.com,App,
+Wishlist: pop up window stays open (case 48),Medium,gautham@example.com,Completed,08/03/2026,10/03/2026,M2,RENJITH R,Web,
+Cart: missing translation (case 49),Low,David Thomas,Completed,09/03/2026,11/03/2026,M2,David Thomas,App,Checked on build 148
+Payments: slow to load (case 50),Medium,david@example.com,Completed,10/03/2026,18/03/2026,M2,,Web,
+Notifications: button does not respond (case 51),Medium,Renjith R,Completed,10/03/2026,18/03/2026,M2,gautham@example.com,App,
+Reviews: validation message unclear (case 52),Medium,RENJITH R,Completed,11/03/2026,19/03/2026,M2,renjith@example.com,Web,Checked on build 151
+Filters: crashes when tapped twice (case 53),Low,renjith@example.com,Completed,12/03/2026,20/03/2026,M2,RENJITH R,App,
+Orders: layout breaks on small screens (case 54),Low,gautham@example.com,Feature existing,12/03/2026,,M2,David Thomas,Web,
+Returns: toast window overlaps header (case 55),Low,David Thomas,Completed,13/03/2026,18/03/2026,M2,,App,Checked on build 154
+Coupons: image not loading (case 56),Medium,david@example.com,Completed,14/03/2026,16/03/2026,M2,gautham@example.com,Web,
+Banner: wrong text shown (case 57),Low,Renjith R,Feature is Coming soon,15/03/2026,,M2,renjith@example.com,App,
+Chat: pop up window stays open (case 58),Medium,RENJITH R,Feature is Coming soon,15/03/2026,,M2,RENJITH R,Web,Checked on build 157
+Address: missing translation (case 59),Low,renjith@example.com,Completed,16/03/2026,19/03/2026,M2,David Thomas,App,
+Delivery: slow to load (case 60),Medium,gautham@example.com,Completed,17/03/2026,19/03/2026,M2,,Web,
+Login: button does not respond (case 61),Low,David Thomas,Completed,18/03/2026,24/03/2026,M2,gautham@example.com,App,Checked on build 160
+Checkout: validation message unclear (case 62),Medium,david@example.com,Completed,18/03/2026,23/03/2026,M2,renjith@example.com,Web,
+Search: crashes when tapped twice (case 63),Medium,Renjith R,Feature existing,19/03/2026,,M2,RENJITH R,App,
+Profile: layout breaks on small screens (case 64),Medium,RENJITH R,Completed,20/03/2026,28/03/2026,M2,David Thomas,Web,Checked on build 163
+Seller onboarding: toast window overlaps header (case 65),High,renjith@example.com,Completed,21/03/2026,24/03/2026,M2,,App,
+Try-on: image not loading (case 66),High,gautham@example.com,Completed,21/03/2026,30/03/2026,M2,gautham@example.com,Web,
+Share link: wrong text shown (case 67),Medium,David Thomas,Completed,22/03/2026,23/03/2026,M2,renjith@example.com,App,Checked on build 166
+Wishlist: pop up window stays open (case 68),Medium,david@example.com,Completed,23/03/2026,27/03/2026,M2,RENJITH R,Web,
+Cart: missing translation (case 69),Low,Renjith R,Completed,23/03/2026,01/04/2026,M2,David Thomas,App,
+Payments: slow to load (case 70),Medium,RENJITH R,Completed,24/03/2026,30/03/2026,M2,,Web,Checked on build 169
+Notifications: button does not respond (case 71),Medium,renjith@example.com,Feature is Coming soon,25/03/2026,,M2,gautham@example.com,App,
+Reviews: validation message unclear (case 72),Medium,gautham@example.com,Completed,26/03/2026,29/03/2026,M2,renjith@example.com,Web,
+Filters: crashes when tapped twice (case 73),Medium,David Thomas,Feature existing,26/03/2026,,M2,RENJITH R,App,Checked on build 172
+Orders: layout breaks on small screens (case 74),Medium,david@example.com,Completed,27/03/2026,04/04/2026,M2,David Thomas,Web,
+Returns: toast window overlaps header (case 75),Medium,Renjith R,Completed,28/03/2026,29/03/2026,M2,,App,
+Coupons: image not loading (case 76),Medium,RENJITH R,Feature not needed,29/03/2026,,M2,gautham@example.com,Web,Checked on build 175
+Banner: wrong text shown (case 77),Low,renjith@example.com,Completed,29/03/2026,04/04/2026,M2,renjith@example.com,App,
+Chat: pop up window stays open (case 78),High,gautham@example.com,Completed,30/03/2026,04/04/2026,M2,RENJITH R,Web,
+Address: missing translation (case 79),High,David Thomas,Completed,31/03/2026,02/04/2026,M2,David Thomas,App,Checked on build 178
+Delivery: slow to load (case 80),Low,david@example.com,Completed,01/04/2026,04/04/2026,M2,,Web,
+Login: button does not respond (case 81),Low,Renjith R,Completed,01/04/2026,04/04/2026,M2,gautham@example.com,App,
+Checkout: validation message unclear (case 82),Medium,RENJITH R,Completed,02/04/2026,04/04/2026,M2,renjith@example.com,Web,Checked on build 181
+Search: crashes when tapped twice (case 83),Medium,renjith@example.com,Completed,03/04/2026,04/04/2026,M2,RENJITH R,App,
+Seller onboarding pop up window or toast window,Medium,Renjith R,In progress,04/04/2026,,M2,,App,
+"There is ""You Might Also Like"" option on product page",Medium,Renjith R,In progress,04/04/2026,,M2,,App,
+Share link opens the wrong product on Android,Medium,Renjith R,In progress,04/04/2026,,M2,,App,

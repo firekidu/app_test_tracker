@@ -1,0 +1,17 @@
+# HTTPS for the tracker. APP_DOMAIN comes from /opt/smprd/.env (e.g. tracker.yourdomain.co.uk,
+# or 57-131-28-237.sslip.io until you have your own domain).
+{$APP_DOMAIN} {
+	# Upload chunks are 4 MiB; leave headroom.
+	request_body {
+		max_size 16MB
+	}
+	reverse_proxy app:3000 {
+		flush_interval -1
+	}
+	header -Server
+}
+
+# Visiting the bare IP sends people to the HTTPS address.
+http://{$VPS_IP} {
+	redir https://{$APP_DOMAIN}{uri} permanent
+}

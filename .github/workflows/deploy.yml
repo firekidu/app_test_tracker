@@ -1,0 +1,113 @@
+name: Test and deploy
+
+on:
+  push:
+    branches: [main, claude/relaxed-einstein-1xpirl]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      # Non-secret defaults; override with repository variables or secrets of the same name.
+      VPS_HOST: ${{ secrets.VPS_HOST || vars.VPS_HOST || '57.131.28.237' }}
+      VPS_USER: ${{ secrets.VPS_USER || vars.VPS_USER || 'ubuntu' }}
+      APP_DOMAIN: ${{ vars.APP_DOMAIN || secrets.APP_DOMAIN || '' }}
+      HAS_PASSWORD: ${{ secrets.VPS_PASSWORD != '' }}
+      HAS_KEY: ${{ secrets.VPS_SSH_KEY != '' }}
+    steps:
+      - name: Check that the server sign-in secret exists
+        id: gate
+        run: |
+          if [ "$HAS_PASSWORD" != "true" ] && [ "$HAS_KEY" != "true" ]; then
+            echo "::warning title=Not deployed::Add the repository secret VPS_PASSWORD (or VPS_SSH_KEY) in Settings → Secrets and variables → Actions, then re-run this workflow."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.go == 'true'
+
+      - name: Prepare SSH
+        if: steps.gate.outputs.go == 'true'
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST_KEY: ${{ secrets.VPS_HOST_KEY }}
+        run: |
+          sudo apt-get install -y sshpass >/dev/null
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          if [ -n "$VPS_SSH_KEY" ]; then
+            printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          fi
+          if [ -n "$VPS_HOST_KEY" ]; then
+            printf '%s\n' "$VPS_HOST_KEY" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -T 15 -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+            echo "Server host key fingerprint (save it as the VPS_HOST_KEY secret to pin it):"
+            ssh-keygen -lf ~/.ssh/known_hosts || true
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy to the VPS
+        if: steps.gate.outputs.go == 'true'
+        env:
+          SSHPASS: ${{ secrets.VPS_PASSWORD }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          ADMIN_USERNAME: ${{ vars.ADMIN_USERNAME || 'david' }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-o ServerAliveInterval=30 -o ConnectTimeout=20 -o StrictHostKeyChecking=yes"
+          if [ -f ~/.ssh/id_deploy ]; then
+            ssh_() { ssh -i ~/.ssh/id_deploy -o BatchMode=yes $SSH_OPTS "$VPS_USER@$VPS_HOST" "$@"; }
+          else
+            ssh_() { sshpass -e ssh -o PreferredAuthentications=password,keyboard-interactive -o PubkeyAuthentication=no $SSH_OPTS "$VPS_USER@$VPS_HOST" "$@"; }
+          fi
+          umask 077
+          {
+            printf 'APP_DOMAIN=%q\n' "$APP_DOMAIN"
+            printf 'VPS_IP=%q\n' "$VPS_HOST"
+            printf 'ADMIN_USERNAME=%q\n' "$ADMIN_USERNAME"
+            printf 'ADMIN_PASSWORD=%q\n' "$ADMIN_PASSWORD"
+            printf 'GOOGLE_CLIENT_ID=%q\n' "$GOOGLE_CLIENT_ID"
+            printf 'GOOGLE_CLIENT_SECRET=%q\n' "$GOOGLE_CLIENT_SECRET"
+            printf 'SUDO_PASSWORD=%q\n' "${SSHPASS:-}"
+          } > deploy.env
+          ssh_ 'umask 077; cat > /tmp/smprd-deploy.env' < deploy.env
+          rm -f deploy.env
+          git archive --format=tar.gz HEAD | ssh_ 'cat > /tmp/smprd-src.tgz'
+          ssh_ 'cat > /tmp/smprd-remote-deploy.sh' < deploy/remote-deploy.sh
+          ssh_ 'bash /tmp/smprd-remote-deploy.sh < /dev/null; rc=$?; rm -f /tmp/smprd-remote-deploy.sh; exit $rc'
+
+      - name: Smoke test over HTTPS
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          DOMAIN="${APP_DOMAIN:-$(echo "$VPS_HOST" | tr . -).sslip.io}"
+          for i in $(seq 1 24); do
+            if curl -fsS "https://$DOMAIN/api/health"; then echo; echo "Live at https://$DOMAIN"; exit 0; fi
+            sleep 10
+          done
+          echo "::warning::HTTPS did not answer yet (the certificate can take a minute). Try https://$DOMAIN shortly."
