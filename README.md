@@ -1,11 +1,12 @@
 # SMPRD Tracker
 
-A web app for the **SMPRD ERROR LOG** Google Sheet. It shows the sheet in its own column format (A–J, plus a new **K "Media"**), adds **progress cards**, lets the team edit Status / Priority / Reported By / Bug Owner (written back to the sheet and logged), and attach, preview and play **photos and videos** on each row. Media is stored in Google Drive.
+A standalone web app for the **SMPRD ERROR LOG**. It keeps the sheet's column format (A–J, plus **K "Media"**), adds **progress cards**, lets the team edit every field (logged in a Change log), and attach, preview and play **photos and videos** on each row.
+
+**Storage (default, `DATA_SOURCE=local`)**: rows, names, change log and accounts live in SQLite on the server (`/data/app.db`); photos and videos on the server disk (`/data/media`). Google is not used. Import your existing sheet once via **Admin → Data → Import CSV**; export any time with **Export CSV**. (The original Google Sheets/Drive mode is still available with `DATA_SOURCE=google`.)
 
 - **Next.js 16** (App Router, TypeScript), one container, Node 26
 - **Better Auth** username + password sign-in (admin-created accounts, 15+ character passwords, lock-out, roles admin / editor / viewer)
 - **SQLite** on a persistent volume (`/data`): accounts, sessions, upload state, media index, encrypted Google token
-- **Google Sheets + Drive** via the admin's one-time "Connect Google" (OAuth, scopes `spreadsheets` + `drive.file`)
 - **Chunked uploads** (4 MiB), HEIC → JPEG, HEVC/MOV → H.264 preview with ffmpeg, HTTP Range streaming
 - Deployed to a VPS with **Docker Compose + Caddy** (automatic HTTPS), by **GitHub Actions**
 
@@ -56,9 +57,8 @@ Then **Actions → Test and deploy → Run workflow**.
 ### First run
 
 1. Open `https://APP_DOMAIN`, sign in with `ADMIN_USERNAME` / `ADMIN_PASSWORD`, choose your own password (15+ characters).
-2. **Admin → Connect Google** (Google shows "unverified app" → Advanced → continue). Publish the OAuth app ("In production") or the token expires after 7 days.
-3. **Admin → Setup checks**: fix K1 header, Change log tab, People tab, Drive folders.
-4. **Admin → People**: merge duplicate spellings. **Admin → Users**: add the team (temporary passwords are shown once).
+2. **Admin → Data → Import CSV**: in Google Sheets use File → Download → CSV, then import it (names are added to People automatically).
+3. **Admin → People**: merge duplicate spellings. **Admin → Users**: add the team (temporary passwords are shown once).
 
 ### Day-to-day on the server
 
@@ -68,4 +68,4 @@ sudo nano /opt/smprd/.env && cd /opt/smprd/src && sudo docker compose up -d   # 
 sudo docker exec -it smprd-app-1 node scripts/reset-admin.mjs david             # locked-out admin
 ```
 
-A daily backup (03:17) of the database and encrypted Google token is written to `/opt/smprd/backups` (14 days kept). Copy that folder off the server from time to time (for example to OVH Object Storage), and keep `/opt/smprd/.env` in a password manager.
+A daily backup (03:17) of the database is written to `/opt/smprd/backups` (14 days kept). Photos and videos are in the `smprd_smprd-data` Docker volume under `media/`. Copy that folder off the server from time to time (for example to OVH Object Storage), and keep `/opt/smprd/.env` in a password manager.

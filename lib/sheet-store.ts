@@ -96,7 +96,7 @@ const pad = (v: string[]) => {
 };
 
 function canUseGoogle() {
-  return config().demo || googleConnected();
+  return config().standalone || googleConnected();
 }
 
 function bumpVersion() {
@@ -427,6 +427,21 @@ export interface RowChanges {
   priority?: string;
   reporter?: string;
   owner?: string;
+  // Standalone mode only (in Google mode these are edited in Sheets):
+  title?: string;
+  reportedDate?: string;
+  endDate?: string;
+  milestone?: string;
+  deliverable?: string;
+  notes?: string;
+}
+
+function normDate(v: string, field: string): string {
+  const t = v.trim();
+  if (!t) return '';
+  const iso = parseUkDate(t);
+  if (!iso) throw new HttpError(422, `${field}: use dd/mm/yyyy.`);
+  return isoToUk(iso);
 }
 
 export function updateRow(n: number, key: string, changes: RowChanges, actor: Actor) {
@@ -456,13 +471,39 @@ export function updateRow(n: number, key: string, changes: RowChanges, actor: Ac
       if (changes.status === 'Completed' && c.AUTO_END_DATE && !v[5].trim()) set(5, 'F', 'End date', isoToUk(todayIso(c.TZ)));
     }
     if (owner !== undefined) set(7, 'H', 'Bug Owner', owner);
+    const textEdit = ['title', 'reportedDate', 'endDate', 'milestone', 'deliverable', 'notes'].some((k) => (changes as Record<string, unknown>)[k] !== undefined);
+    if (textEdit && !c.standalone) throw new HttpError(422, 'Edit this field in Google Sheets.');
+    if (changes.title !== undefined) {
+      const t = changes.title.trim();
+      if (!t) throw new HttpError(422, 'Describe the bug.');
+      set(0, 'A', 'Bugs', t.slice(0, 5000));
+    }
+    if (changes.reportedDate !== undefined) {
+      const d = normDate(changes.reportedDate, 'Reported Date');
+      if (!d) throw new HttpError(422, 'Reported Date is required.');
+      set(4, 'E', 'Reported Date', d);
+    }
+    if (changes.endDate !== undefined) set(5, 'F', 'End date', normDate(changes.endDate, 'End date'));
+    if (changes.milestone !== undefined) set(6, 'G', 'Milestone', changes.milestone.trim().slice(0, 500));
+    if (changes.deliverable !== undefined) set(8, 'I', 'Deliverable', changes.deliverable.trim().slice(0, 500));
+    if (changes.notes !== undefined) set(9, 'J', 'Notes', changes.notes.trim().slice(0, 5000));
+    const newKey = rowKeyFromValues(v);
+    if (newKey !== key && (S().raw ?? []).some((x) => x.rowNumber !== r.n && rowKeyFromValues(x.values) === newKey))
+      throw new HttpError(409, 'Another row already has the same date and text.');
     if (updates.length) {
       await sheets().batchUpdate(updates);
       applyLocal(r.n, v);
+      if (newKey !== key) {
+        // Keep photos/videos and history attached when the text or date changes.
+        db().prepare('UPDATE media SET row_key = ? WHERE row_key = ?').run(newKey, key);
+        db().prepare('UPDATE uploads SET row_key = ? WHERE row_key = ?').run(newKey, key);
+        for (const e of S().changeLog) if (e.rowKey === key) e.rowKey = newKey;
+        for (const l of lines) l[2] = newKey;
+      }
       await appendChangeLog(lines);
       bumpVersion();
     }
-    return { rowNumber: r.n, movedFrom: r.movedFrom, changed: lines.map((l) => ({ field: l[4], from: l[5], to: l[6] })) };
+    return { rowNumber: r.n, rowKey: newKey, movedFrom: r.movedFrom, changed: lines.map((l) => ({ field: l[4], from: l[5], to: l[6] })) };
   });
 }
 
@@ -487,7 +528,10 @@ export function addRow(input: NewRow, actor: Actor) {
     if (!input.title.trim()) throw new HttpError(422, 'Describe the bug.');
     if (!(STATUSES as readonly string[]).includes(input.status)) throw new HttpError(422, 'Unknown status.');
     if (!(PRIORITIES as readonly string[]).includes(input.priority)) throw new HttpError(422, 'Unknown priority.');
-    const reporter = requireActivePerson(input.reporter || actor.personName || actor.displayName, false);
+    const selfName = actor.personName || actor.displayName;
+    const reporterIn = input.reporter || selfName;
+    if (c.standalone && normalizeText(reporterIn) === normalizeText(selfName)) await ensurePersonUnlocked(selfName, actor.displayName);
+    const reporter = requireActivePerson(reporterIn, false);
     const owner = requireActivePerson(input.owner, true);
     const values = [input.title.trim(), input.priority, reporter, input.status, isoToUk(todayIso(c.TZ)), '', '', owner, '', input.notes.trim(), ''];
     const n = (await sheets().append(rng(c.SHEET_TAB, 'A:K'), [values])) ?? ((S().raw ?? []).reduce((m, r) => Math.max(m, r.rowNumber), 1) + 1);
@@ -736,5 +780,125 @@ export function runSetupStep(step: string) {
     }
     s.tabsReadAt = 0;
     await syncUnlocked({ forceChangeLog: true });
+  });
+}
+
+// ---------- Standalone (local database) ----------
+export function standaloneSetup() {
+  return withLock(async () => {
+    const c = config();
+    if (!c.standalone) return;
+    const tabs = await sheets().listTabs();
+    const has = (t: string) => tabs.some((x) => x.title === t);
+    if (!has(c.SHEET_TAB)) {
+      await sheets().addTab(c.SHEET_TAB);
+      await sheets().batchUpdate([{ range: rng(c.SHEET_TAB, 'A1:K1'), values: [[...HEADERS]] }]);
+    }
+    if (!has(c.CHANGELOG_TAB)) {
+      await sheets().addTab(c.CHANGELOG_TAB);
+      await sheets().batchUpdate([{ range: rng(c.CHANGELOG_TAB, 'A1:J1'), values: [CHANGELOG_HEADER] }]);
+    }
+    if (!has(c.PEOPLE_TAB)) {
+      await sheets().addTab(c.PEOPLE_TAB);
+      await sheets().batchUpdate([{ range: rng(c.PEOPLE_TAB, 'A1:E1'), values: [PEOPLE_HEADER] }]);
+    }
+    await ensureDriveRootUnlocked();
+    const s = S();
+    s.tabsReadAt = 0;
+    await syncUnlocked({ forceChangeLog: true });
+    if (c.SEED_CSV && !(s.raw ?? []).length) {
+      const fs = await import('node:fs');
+      if (fs.existsSync(c.SEED_CSV)) {
+        const { parseCsv } = await import('./csv');
+        await importUnlocked(parseCsv(fs.readFileSync(c.SEED_CSV, 'utf8')), 'replace', 'setup');
+        console.log(`[setup] Imported ${(s.raw ?? []).length} rows from ${c.SEED_CSV}`);
+      }
+    }
+  });
+}
+
+const COL_ALIASES: Record<string, number> = {
+  bugs: 0, bug: 0, title: 0, priority: 1, 'reported by': 2, reporter: 2, status: 3, 'reported date': 4, date: 4,
+  'end date': 5, milestone: 6, 'bug owner': 7, owner: 7, deliverable: 8, notes: 9,
+};
+
+/** Map an uploaded CSV (header row + data) to A–J values. */
+export function csvToRows(grid: string[][]): string[][] {
+  const rows = grid.filter((r) => r.some((c) => (c ?? '').trim()));
+  if (!rows.length) throw new HttpError(422, 'The file is empty.');
+  const header = rows[0].map((h) => normalizeText(h));
+  const map = header.map((h) => COL_ALIASES[h] ?? -1);
+  if (!map.includes(0)) throw new HttpError(422, 'The first row must be the header and include a "Bugs" column.');
+  const out: string[][] = [];
+  for (const r of rows.slice(1)) {
+    const v = Array(HEADERS.length).fill('') as string[];
+    map.forEach((col, i) => {
+      if (col >= 0) v[col] = (r[i] ?? '').trim();
+    });
+    if (!v[0]) continue;
+    for (const d of [4, 5]) if (v[d]) v[d] = parseUkDate(v[d]) ? isoToUk(parseUkDate(v[d])!) : v[d];
+    out.push(v);
+  }
+  return out;
+}
+
+async function importUnlocked(grid: string[][], mode: 'replace' | 'append', by: string) {
+  const c = config();
+  const s = S();
+  const rows = csvToRows(grid);
+  const be = sheets();
+  if (!be.replaceGrid) throw new HttpError(422, 'Import is only available in standalone mode.');
+  const existing = mode === 'append' ? (s.raw ?? []).map((r) => pad(r.values)) : [];
+  // keep media links (column K) for rows that already existed with the same key
+  const kByKey = new Map((s.raw ?? []).map((r) => [rowKeyFromValues(r.values), r.values[10]]));
+  const incoming = rows.map((v) => {
+    const k = kByKey.get(rowKeyFromValues(v));
+    if (k) v[10] = k;
+    return v;
+  });
+  await be.replaceGrid(c.SHEET_TAB, [[...HEADERS], ...existing, ...incoming]);
+  // Names: add any Reported By / Bug Owner values People doesn't know yet.
+  const known = buildPeopleIndex(s.people);
+  const unknown = incoming.flatMap((v) => [v[2], v[7]]).filter((x) => x && !resolveName(x, known).known);
+  const add = suggestPeople(unknown).filter((p) => !findPersonClash(p.name, p.spellings, s.people));
+  if (add.length) {
+    const today = isoToUk(todayIso(c.TZ));
+    await be.append(rng(c.PEOPLE_TAB, 'A:E'), add.map((p) => [p.name, p.spellings.join(', '), 'TRUE', by, today]));
+  }
+  await appendChangeLog([[ukTimestamp(c.TZ), '', '', '', 'Rows imported', '', `${incoming.length} rows (${mode})`, by, 'App', '']]);
+  s.raw = null;
+  s.tabsReadAt = 0;
+  await syncUnlocked({ forceChangeLog: true });
+  return { imported: incoming.length, total: (s.raw ?? []).length, namesAdded: add.length };
+}
+
+export function importRows(grid: string[][], mode: 'replace' | 'append', actor: Actor) {
+  return withLock(() => importUnlocked(grid, mode, actor.personName || actor.displayName));
+}
+
+export async function exportGrid(): Promise<string[][]> {
+  const snap = await snapshot();
+  return [
+    ['Bugs', 'Priority', 'Reported By', 'Status', 'Reported Date', 'End date', 'Milestone', 'Bug Owner', 'Deliverable', 'Notes', 'Photos & videos'],
+    ...snap.rows.map((r) => [r.title, r.priority, r.reporter, r.status, r.reportedDate, r.endDate, r.milestone, r.owner, r.deliverable, r.notes, String(r.media.length)]),
+  ];
+}
+
+/** Add a name to People if it is not there yet (no error when it exists). */
+async function ensurePersonUnlocked(name: string, by: string) {
+  const c = config();
+  const s = S();
+  const n = name.trim().replace(/\s+/g, ' ');
+  if (!n || !s.peopleTabExists || validatePersonName(n)) return;
+  if (findPersonClash(n, [], s.people)) return;
+  const today = isoToUk(todayIso(c.TZ));
+  const row = await sheets().append(rng(c.PEOPLE_TAB, 'A:E'), [[n, '', 'TRUE', by, today]]);
+  s.people.push({ name: n, spellings: [], active: true, addedBy: by, addedOn: today, sheetRow: row ?? undefined });
+  bumpVersion();
+}
+export function ensurePerson(name: string, by: string) {
+  return withLock(async () => {
+    await ensureFreshUnlocked();
+    await ensurePersonUnlocked(name, by);
   });
 }

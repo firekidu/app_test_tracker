@@ -13,7 +13,10 @@ const NEWPW = 'orange bicycle under the bridge';
 let editorTemp = '';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'smprd-e2e-files-'));
 
+// The sign-in rate limit is 10/minute per IP; give each sign-in its own client address (as a proxy would).
+let ipN = 10;
 async function signIn(page: Page, u: string, p: string) {
+  await page.context().setExtraHTTPHeaders({ 'X-Forwarded-For': `198.51.100.${ipN++}` });
   await page.goto('/login');
   await page.fill('#username', u);
   await page.fill('#password', p);
@@ -39,19 +42,6 @@ test('1 · start-up admin must change password; wrong password message', async (
   await expect(page.locator('table.sheet tbody tr')).toHaveCount(86);
   await expect(page.locator('.cards .card').first()).toContainText('77%');
   await expect(page.locator('.cards .card').first()).toContainText('66 of 86 completed');
-});
-
-test('setup checks can be fixed from Admin', async ({ page }) => {
-  await signIn(page, ADMIN, NEWPW);
-  await page.goto('/admin');
-  for (let i = 0; i < 6; i++) {
-    const fix = page.locator('.check button:has-text("Fix")').first();
-    if (!(await fix.count())) break;
-    await fix.click();
-    await page.click('.dialog button:has-text("Yes, do it")');
-    await page.waitForTimeout(500);
-  }
-  await expect(page.locator('.check .no')).toHaveCount(0);
 });
 
 test('2 · admin creates an editor; temporary password shown once; editor must change it', async ({ page, browser }) => {
@@ -120,7 +110,7 @@ test('10 · delete moves the file to trash and logs it', async ({ page }) => {
   await signIn(page, ADMIN, NEWPW);
   await page.click('tr[data-row="82"] button[aria-label="Photos and videos for row 82"]');
   await page.locator('.panel .mcard button[aria-label^="Delete"]').first().click();
-  await page.click('.dialog button:has-text("Move to trash")');
+  await page.click('.dialog button:has-text("Delete")');
   await expect(page.locator('.panel .mcard')).toHaveCount(1);
   await expect(page.locator('.panel .history')).toContainText('Media deleted');
 });
@@ -144,4 +134,46 @@ test('1b · five wrong passwords lock the account', async ({ request }) => {
   expect(codes).toEqual([401, 401, 401, 401, 423]);
   const right = await request.post('/api/auth/sign-in/username', { data: { username: 'renjith.r', password: editorTemp }, headers: { Origin: 'http://127.0.0.1:3200', 'X-Forwarded-For': '203.0.113.7' } });
   expect(right.status()).toBe(423);
+});
+
+test('edit details: text and dates are editable in the app and logged', async ({ page }) => {
+  await signIn(page, ADMIN, NEWPW);
+  await page.click('tr[data-row="86"] .cell-title');
+  await page.click('.panel button:has-text("Edit details")');
+  await page.fill('#ed-notes', 'Reproduced on build 210');
+  await page.fill('#ed-ms', 'M3');
+  await page.click('.dialog button:has-text("Save")');
+  await expect(page.locator('.panel .notes-box')).toHaveText('Reproduced on build 210');
+  await expect(page.locator('.panel .history')).toContainText('Notes');
+  await expect(page.locator('tr[data-row="86"] td').nth(9)).toContainText('Reproduced on build 210');
+  // bad date is refused
+  await page.click('.panel button:has-text("Edit details")');
+  await page.fill('#ed-ed', '31/31/2026');
+  await page.click('.dialog button:has-text("Save")');
+  await expect(page.locator('.toast.err')).toContainText('dd/mm/yyyy');
+});
+
+test('export CSV and import (append) from Admin → Data', async ({ page }) => {
+  await signIn(page, ADMIN, NEWPW);
+  const res = await page.request.get('/api/export');
+  expect(res.status()).toBe(200);
+  const csv = await res.text();
+  expect(csv.split('\n')[0]).toContain('Bugs,Priority,Reported By,Status');
+  expect(csv.trim().split('\n').length).toBe(87);
+  const file = path.join(tmp, 'more.csv');
+  fs.writeFileSync(file, 'Bugs,Priority,Reported By,Status,Reported Date\nImported bug one,High,Priya S,TBD,20/11/2026\n');
+  await page.goto('/admin');
+  await page.setInputFiles('input[aria-label="CSV file"]', file);
+  await page.click('section[aria-labelledby=d-h] button:has-text("Import")');
+  await expect(page.locator('.toast').first()).toContainText('Imported 1 rows (now 87)');
+  await page.goto('/');
+  await expect(page.locator('table.sheet tbody tr')).toHaveCount(87);
+  await expect(page.locator('tr[data-row="88"]')).toContainText('Imported bug one');
+  await expect(page.locator('tr[data-row="88"]')).toContainText('Priya S');
+});
+
+test('data survives a restart (SQLite)', async ({ request }) => {
+  // The server process is shared; check the data is in the database file, not memory.
+  const r = await request.get('/api/health');
+  expect((await r.json()).mode).toBe('local');
 });

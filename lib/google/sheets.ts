@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { config } from '../config';
+import { db } from '../db';
 import { parseCsv } from '../csv';
 import { googleFetch } from './oauth';
 
@@ -15,6 +16,7 @@ export interface SheetBackend {
   append(range: string, values: string[][]): Promise<number | null>;
   listTabs(): Promise<TabInfo[]>;
   addTab(title: string): Promise<number>;
+  replaceGrid?(title: string, grid: string[][]): Promise<void>;
 }
 
 /** 'Tab name'!A1:K */
@@ -179,6 +181,46 @@ export class MemorySheets implements SheetBackend {
     this.tabs.set(title, { sheetId: id, grid: [] });
     return id;
   }
+  /** Replace a whole tab (used by CSV import in standalone mode). */
+  async replaceGrid(title: string, grid: string[][]) {
+    this.tab(title).grid = grid.map((r) => [...r]);
+  }
+}
+
+/** Standalone storage: the same tabs as MemorySheets, persisted in SQLite (/data/app.db). */
+export class SqliteSheets extends MemorySheets {
+  constructor() {
+    super();
+    db().exec('CREATE TABLE IF NOT EXISTS sheet_tabs (title TEXT PRIMARY KEY, sheet_id INTEGER NOT NULL, grid TEXT NOT NULL)');
+    for (const r of db().prepare('SELECT title, sheet_id, grid FROM sheet_tabs').all() as { title: string; sheet_id: number; grid: string }[]) {
+      this.tabs.set(r.title, { sheetId: r.sheet_id, grid: JSON.parse(r.grid) });
+    }
+  }
+  private save(title: string) {
+    const t = this.tabs.get(title);
+    if (!t) return;
+    db()
+      .prepare('INSERT INTO sheet_tabs(title, sheet_id, grid) VALUES (?, ?, ?) ON CONFLICT(title) DO UPDATE SET grid = excluded.grid, sheet_id = excluded.sheet_id')
+      .run(title, t.sheetId, JSON.stringify(t.grid));
+  }
+  async batchUpdate(data: { range: string; values: string[][] }[]) {
+    await super.batchUpdate(data);
+    for (const t of new Set(data.map((d) => parseRange(d.range).tab))) this.save(t);
+  }
+  async append(range: string, values: string[][]) {
+    const n = await super.append(range, values);
+    this.save(parseRange(range).tab);
+    return n;
+  }
+  async addTab(title: string) {
+    const id = await super.addTab(title);
+    this.save(title);
+    return id;
+  }
+  async replaceGrid(title: string, grid: string[][]) {
+    await super.replaceGrid(title, grid);
+    this.save(title);
+  }
 }
 
 const g = globalThis as unknown as { __smprdSheets?: SheetBackend };
@@ -188,7 +230,8 @@ export function sheets(): SheetBackend {
     if (c.demo) {
       const grid = parseCsv(fs.readFileSync(c.DEMO_SHEET_CSV, 'utf8')).filter((r) => r.some((x) => x !== ''));
       g.__smprdSheets = new MemorySheets({ [c.SHEET_TAB]: grid });
-    } else g.__smprdSheets = new GoogleSheets(c.SHEET_ID);
+    } else if (c.DATA_SOURCE === 'local') g.__smprdSheets = new SqliteSheets();
+    else g.__smprdSheets = new GoogleSheets(c.SHEET_ID);
   }
   return g.__smprdSheets;
 }

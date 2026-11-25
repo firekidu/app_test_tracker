@@ -19,13 +19,14 @@ export async function GET(req: Request) {
       const s = fs.statfsSync(dataPath());
       disk = { freeMb: Math.round((s.bavail * s.bsize) / 1048576), totalMb: Math.round((s.blocks * s.bsize) / 1048576) };
     } catch {}
-    const checks = await setupChecks().catch((e) => [{ step: 'sheet', label: 'Sheet readable', ok: false, detail: (e as Error).message }]);
+    const checks = c.standalone ? [] : await setupChecks().catch((e) => [{ step: 'sheet', label: 'Sheet readable', ok: false, detail: (e as Error).message }]);
     const failedUploads = (db().prepare("SELECT COUNT(*) AS n FROM uploads WHERE status = 'failed'").get() as { n: number }).n;
     return json({
       demo: c.demo,
+      mode: c.mode,
       google: {
         configured: googleConfigured(),
-        connected: c.demo || googleConnected(),
+        connected: c.standalone || googleConnected(),
         email: t?.email ?? null,
         scopes: t?.scopes ?? [],
         connectedAt: t?.connectedAt ?? null,

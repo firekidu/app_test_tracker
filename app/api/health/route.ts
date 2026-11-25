@@ -16,7 +16,7 @@ export async function GET() {
   }
   const s = syncStatus();
   return Response.json(
-    { ok: dbOk, google: config().demo ? 'demo' : googleConnected() ? 'connected' : 'missing', lastSync: s.syncedAt, queue: queueLength() },
+    { ok: dbOk, mode: config().mode, google: config().standalone ? 'not used' : googleConnected() ? 'connected' : 'missing', lastSync: s.syncedAt, queue: queueLength() },
     { status: dbOk ? 200 : 503, headers: { 'Cache-Control': 'no-store' } },
   );
 }

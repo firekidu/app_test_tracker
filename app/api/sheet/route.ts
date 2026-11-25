@@ -22,7 +22,7 @@ export async function GET(req: Request) {
       stats: snap.stats,
       people: snap.people,
       me: { name: u.personName || u.displayName, role: u.role, username: u.username, displayName: u.displayName },
-      sync: { ok: !snap.error, error: snap.error, googleConnected: c.demo || googleConnected(), demo: c.demo },
+      sync: { ok: !snap.error, error: snap.error, googleConnected: c.standalone || googleConnected(), demo: c.demo, mode: c.mode },
       sheetGid: snap.gids.sheet,
       sheetId: c.SHEET_ID,
       openStatuses: c.openStatuses,

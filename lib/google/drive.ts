@@ -274,6 +274,7 @@ export class LocalDrive implements DriveBackend {
   async trash(id: string) {
     const f = this.read(id);
     if (f) this.write({ ...f, trashed: true });
+    fs.rmSync(path.join(this.root, `${id}.bin`), { force: true }); // free the disk space
   }
   async setDescription(id: string, description: string) {
     const f = this.read(id);
@@ -315,7 +316,10 @@ export function rangeStream(file: string, size: number, mimeType: string, range?
 
 const g = globalThis as unknown as { __smprdDrive?: DriveBackend };
 export function drive(): DriveBackend {
-  if (!g.__smprdDrive) g.__smprdDrive = config().demo ? new LocalDrive(dataPath('demo-drive')) : new GoogleDrive();
+  if (!g.__smprdDrive) {
+    const c = config();
+    g.__smprdDrive = c.demo ? new LocalDrive(dataPath('demo-drive')) : c.standalone ? new LocalDrive(dataPath('media')) : new GoogleDrive();
+  }
   return g.__smprdDrive;
 }
 export function setDriveBackend(b: DriveBackend | undefined) {

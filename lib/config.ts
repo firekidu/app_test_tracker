@@ -39,6 +39,10 @@ const schema = z.object({
   AUTO_END_DATE: bool(true),
   TZ: z.string().default('Europe/London'),
   DATA_DIR: z.string().default('./.data'),
+  /** Where rows and media live. "local" (default): SQLite + server disk, no Google. "google": Google Sheets + Drive. */
+  DATA_SOURCE: z.enum(['local', 'google']).default('local'),
+  /** Local mode: import this CSV (Sheet1 export) on first start when there are no rows yet. */
+  SEED_CSV: z.string().default(''),
   /** Development / demo only: use an in-memory sheet seeded from this CSV and a local-disk "Drive". */
   DEMO_SHEET_CSV: z.string().default(''),
 });
@@ -53,6 +57,9 @@ function loadConfig() {
     openStatuses: env.OPEN_STATUSES.split(',').map((s) => s.trim()).filter(Boolean),
     maxUploadBytes: env.MAX_UPLOAD_MB * 1024 * 1024,
     demo: env.DEMO_SHEET_CSV !== '',
+    /** True when Google is not used at all (local database or demo). */
+    standalone: env.DEMO_SHEET_CSV !== '' || env.DATA_SOURCE === 'local',
+    mode: (env.DEMO_SHEET_CSV !== '' ? 'demo' : env.DATA_SOURCE) as 'demo' | 'local' | 'google',
   };
 }
 

@@ -4,6 +4,7 @@ import {
   Camera,
   Check,
   ChevronDown,
+  Download,
   ExternalLink,
   Image as ImageIcon,
   KeyRound,
@@ -199,7 +200,7 @@ function Tracker() {
       const r = await api<{ row: Row; movedFrom?: number; changed: { field: string; from: string; to: string }[] }>('PATCH', `/api/rows/${row.rowNumber}`, { rowKey: row.rowKey, changes });
       const n = r.row?.rowNumber ?? row.rowNumber;
       if (r.changed.length) toast(`Row ${n}: ${r.changed.map((c) => `${c.field} → ${c.to || '(blank)'}`).join(', ')}`);
-      if (r.movedFrom) toast(`Row moved in Google Sheets: ${r.movedFrom} → ${n}`);
+      if (r.movedFrom) toast(`Row moved: ${r.movedFrom} → ${n}`);
       if (f.row === row.rowNumber && n !== row.rowNumber) update({ row: n });
       await refresh(true);
     } catch (e) {
@@ -217,7 +218,7 @@ function Tracker() {
   async function doDelete(m: MediaSummary) {
     try {
       await api('DELETE', `/api/media/${m.fileId}`);
-      toast(`${m.name} moved to Google Drive trash.`);
+      toast(data?.sync.mode === 'google' ? `${m.name} moved to Google Drive trash.` : `${m.name} deleted.`);
       if (f.media === m.fileId) {
         const list = panelRow?.media.filter((x) => x.fileId !== m.fileId) ?? [];
         update({ media: list.length ? list[Math.min(previewIdx, list.length - 1)].fileId : null });
@@ -261,6 +262,7 @@ function Tracker() {
     );
 
   const sheetUrl = `https://docs.google.com/spreadsheets/d/${data.sheetId}/edit${data.sheetGid != null ? `#gid=${data.sheetGid}` : ''}`;
+  const google = data.sync.mode === 'google';
   const rowLink = (n: number) => `https://docs.google.com/spreadsheets/d/${data.sheetId}/edit#gid=${data.sheetGid ?? 0}&range=A${n}`;
   const openRow = (n: number) => update({ row: n, media: null }, true);
   const openMedia = (row: Row, m: MediaSummary) => update({ row: row.rowNumber, media: m.fileId }, true);
@@ -269,7 +271,7 @@ function Tracker() {
   return (
     <>
       <Header data={data} sheetUrl={sheetUrl} canEdit={!!canEdit} onAdd={() => setAddOpen(true)} />
-      {data.sync.demo && <div className="demo-banner">Demo mode: this server uses a local copy of the sheet and local media storage, not Google.</div>}
+      {data.sync.demo && <div className="demo-banner">Demo mode: changes are kept in memory only and are lost when the server restarts.</div>}
       <main className="page">
         {isPhone ? (
           <PhoneView
@@ -307,6 +309,7 @@ function Tracker() {
           canEdit={!!canEdit}
           isAdmin={!!isAdmin}
           sheetLink={rowLink(panelRow.rowNumber)}
+          google={google}
           uploads={uploads}
           busy={busy}
           onClose={() => update({ row: null, media: null })}
@@ -327,7 +330,7 @@ function Tracker() {
           onClose={() => update({ media: null })}
           canEdit={!!canEdit}
           canDelete={canDelete}
-          isAdmin={!!isAdmin}
+          isAdmin={!!isAdmin && google}
           onDelete={(m) => setConfirmDel(m)}
           onCaption={saveCaption}
         />
@@ -335,8 +338,8 @@ function Tracker() {
       {confirmDel && (
         <ConfirmDialog
           title="Delete file"
-          message={`Move ${confirmDel.name} to Google Drive trash? You can restore it from Drive for 30 days.`}
-          confirmLabel="Move to trash"
+          message={google ? `Move ${confirmDel.name} to Google Drive trash? You can restore it from Drive for 30 days.` : `Delete ${confirmDel.name}? This cannot be undone.`}
+          confirmLabel={google ? 'Move to trash' : 'Delete'}
           danger
           onCancel={() => setConfirmDel(null)}
           onConfirm={() => doDelete(confirmDel)}
@@ -361,7 +364,7 @@ function Tracker() {
 
 // ---------------- header ----------------
 function SyncLine({ data, short }: { data: SheetPayload; short?: boolean }) {
-  if (!data.sync.googleConnected)
+  if (data.sync.mode === 'google' && !data.sync.googleConnected)
     return (
       <div className="sync-line">
         <span className="bad">Google not connected</span>
@@ -379,11 +382,11 @@ function SyncLine({ data, short }: { data: SheetPayload; short?: boolean }) {
   return (
     <div className="sync-line">
       <span className="ok">
-        <Check className="icon" style={{ width: 13, height: 13 }} /> Synced with Google Sheets
+        <Check className="icon" style={{ width: 13, height: 13 }} /> {data.sync.mode === 'google' ? 'Synced with Google Sheets' : 'All changes saved'}
       </span>
       {!short && (
         <>
-          <span>· Sheet1</span>
+          {data.sync.mode === 'google' && <span>· Sheet1</span>}
           <span>· Last activity: {prettyDate(data.lastActivity) || '—'}</span>
         </>
       )}
@@ -445,9 +448,15 @@ function Header({ data, sheetUrl, canEdit, onAdd }: { data: SheetPayload; sheetU
         </div>
       </div>
       <div className="actions">
-        <a className="btn desktop-only" href={sheetUrl} target="_blank" rel="noopener noreferrer">
-          <ExternalLink className="icon" /> Open in Google Sheets
-        </a>
+        {data.sync.mode === 'google' ? (
+          <a className="btn desktop-only" href={sheetUrl} target="_blank" rel="noopener noreferrer">
+            <ExternalLink className="icon" /> Open in Google Sheets
+          </a>
+        ) : (
+          <a className="btn desktop-only" href="/api/export" download>
+            <Download className="icon" /> Export CSV
+          </a>
+        )}
         {canEdit && (
           <>
             <button type="button" className="btn primary desktop-only" onClick={onAdd}>
@@ -581,7 +590,7 @@ function ProgressCards({ data, status, setStatus }: { data: SheetPayload; status
           )}
         </div>
         <div className="card-foot">
-          {s.media.photos} photo{s.media.photos === 1 ? '' : 's'} · {s.media.videos} video{s.media.videos === 1 ? '' : 's'} · in Google Drive
+          {s.media.photos} photo{s.media.photos === 1 ? '' : 's'} · {s.media.videos} video{s.media.videos === 1 ? '' : 's'} {data.sync.mode === 'google' ? ' · in Google Drive' : ''}
         </div>
       </div>
     </section>
@@ -817,13 +826,13 @@ function SheetTable({
             ))}
           </tbody>
         </table>
-        {!rows.length && <div className="empty">{data.rows.length ? 'No rows match these filters.' : data.sync.googleConnected ? 'The sheet has no rows yet.' : 'Google is not connected yet, so there is no sheet to show.'}</div>}
+        {!rows.length && <div className="empty">{data.rows.length ? 'No rows match these filters.' : data.sync.googleConnected ? (data.me.role === 'admin' && data.sync.mode !== 'google' ? 'No rows yet. Use “Add row”, or import your existing sheet as CSV in Admin → Data.' : 'No rows yet.') : 'Google is not connected yet, so there is no sheet to show.'}</div>}
       </div>
       <div className="table-foot">
         <span>
-          {rows.length ? `Showing rows ${a}–${b} of ${data.stats.total}${rows.length !== data.stats.total ? ` (${rows.length} match)` : ''}` : `0 of ${data.stats.total} rows`} · same columns and order as the Google Sheet, plus Media in column K
+          {rows.length ? `Showing rows ${a}–${b} of ${data.stats.total}${rows.length !== data.stats.total ? ` (${rows.length} match)` : ''}` : `0 of ${data.stats.total} rows`} · same columns and order as the SMPRD ERROR LOG sheet, plus Media in column K
         </span>
-        <span>Edits here write back to Sheet1 · files are stored in Google Drive</span>
+        <span>{data.sync.mode === 'google' ? 'Edits here write back to Sheet1 · files are stored in Google Drive' : 'Saved in the tracker database · files are stored on the server'}</span>
       </div>
     </div>
   );

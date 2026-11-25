@@ -2,8 +2,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { defineConfig } from '@playwright/test';
 
-// End-to-end tests run against DEMO mode (in-memory copy of the fixture sheet, local-disk "Drive"),
-// so they need no Google account. Run: npm run build && npm run test:e2e
+// End-to-end tests run against the standalone production mode (SQLite + local media),
+// seeded from the fixture CSV on first start. Run: npm run build && npm run test:e2e
 const port = 3200;
 const dataDir = path.join(os.tmpdir(), `smprd-e2e-${Date.now()}`);
 
@@ -23,7 +23,7 @@ export default defineConfig({
       HOSTNAME: '127.0.0.1',
       APP_URL: `http://127.0.0.1:${port}`,
       DATA_DIR: dataDir,
-      DEMO_SHEET_CSV: path.resolve('tests/fixtures/sheet-2026-11-24.csv'),
+      SEED_CSV: path.resolve('tests/fixtures/sheet-2026-11-24.csv'),
       INITIAL_ADMIN_USERNAME: 'david',
       INITIAL_ADMIN_PASSWORD: 'temporary admin pass 2026',
       BETTER_AUTH_SECRET: 'e2e-only-secret-e2e-only-secret-1234',

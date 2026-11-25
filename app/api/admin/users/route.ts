@@ -5,6 +5,8 @@ import { USERNAME_RE, createAccount, normalizeUsername } from '@/lib/auth';
 import { randomPassword } from '@/lib/crypto';
 import { db } from '@/lib/db';
 import { logAuthEvent } from '@/lib/lockout';
+import { config } from '@/lib/config';
+import { ensurePerson } from '@/lib/sheet-store';
 
 export const runtime = 'nodejs';
 
@@ -26,7 +28,9 @@ export async function POST(req: Request) {
     if (!USERNAME_RE.test(username)) return jsonError(422, 'Usernames are 3–30 characters: letters, digits, ".", "-" and "_".');
     if (db().prepare('SELECT 1 FROM "user" WHERE username = ?').get(username)) return jsonError(409, 'That username is taken.');
     const temporaryPassword = randomPassword(20);
-    const user = await createAccount({ username, displayName: b.displayName, personName: b.personName.trim(), role: b.role, password: temporaryPassword, mustChangePassword: true });
+    const personName = b.personName.trim() || (config().standalone ? b.displayName.trim() : '');
+    if (config().standalone && personName) await ensurePerson(personName, admin.displayName).catch(() => undefined);
+    const user = await createAccount({ username, displayName: b.displayName, personName, role: b.role, password: temporaryPassword, mustChangePassword: true });
     logAuthEvent('account_created', username, admin.username);
     return json({ user: { id: user.id, username }, temporaryPassword }, 201);
   });

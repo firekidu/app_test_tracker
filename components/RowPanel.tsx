@@ -1,10 +1,10 @@
 'use client';
-import { Camera, Download, ExternalLink, Folder, Image as ImageIcon, Loader2, RotateCcw, Trash2, Upload, Video, X } from 'lucide-react';
+import { Camera, Download, ExternalLink, Pencil, Folder, Image as ImageIcon, Loader2, RotateCcw, Trash2, Upload, Video, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeLogEntry, MediaSummary, Person, Row } from '@/lib/types';
 import { NamePicker } from './NamePicker';
 import type { Uploads } from './useUploads';
-import { ChipSelect, PRIORITIES, PriorityChip, STATUS_EDIT_ORDER, StatusChip, api, fmtBytes, fmtDuration, prettyDate, trapTab } from './ui';
+import { ChipSelect, Dialog, PRIORITIES, PriorityChip, STATUS_EDIT_ORDER, StatusChip, api, fmtBytes, fmtDuration, prettyDate, trapTab } from './ui';
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,video/mp4,video/quicktime,.mov';
 
@@ -14,7 +14,7 @@ function upLabel(s: string) {
       return 'Waiting…';
     case 'queued':
     case 'uploading_to_drive':
-      return 'Saving to Google Drive…';
+      return 'Saving…';
     case 'processing':
       return 'Making preview…';
     case 'done':
@@ -40,6 +40,7 @@ export default function RowPanel({
   canDelete,
   maxMb,
   rootFolderName,
+  google,
 }: {
   row: Row;
   people: Person[];
@@ -56,7 +57,9 @@ export default function RowPanel({
   canDelete: (m: MediaSummary) => boolean;
   maxMb: number;
   rootFolderName: string;
+  google: boolean;
 }) {
+  const [editing, setEditing] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const fileIn = useRef<HTMLInputElement>(null);
   const camIn = useRef<HTMLInputElement>(null);
@@ -77,7 +80,7 @@ export default function RowPanel({
     return () => {
       live = false;
     };
-  }, [row.rowNumber, row.rowKey, row.status, row.priority, row.owner, row.media.length]);
+  }, [row.rowNumber, row.rowKey, row.status, row.priority, row.owner, row.reporter, row.endDate, row.milestone, row.deliverable, row.notes, row.media.length]);
 
   const addFiles = (files: FileList | null) => {
     if (files && files.length) uploads.addFiles({ rowNumber: row.rowNumber, rowKey: row.rowKey }, files);
@@ -142,10 +145,17 @@ export default function RowPanel({
           </div>
           {row.notes && <div className="notes-box">{row.notes}</div>}
           <p style={{ margin: '10px 0 0', fontSize: 13 }}>
-            <a href={sheetLink} target="_blank" rel="noopener noreferrer">
-              Edit this row in Google Sheets <ExternalLink className="icon" style={{ width: 13, height: 13, verticalAlign: -2 }} />
-            </a>
+            {google ? (
+              <a href={sheetLink} target="_blank" rel="noopener noreferrer">
+                Edit this row in Google Sheets <ExternalLink className="icon" style={{ width: 13, height: 13, verticalAlign: -2 }} />
+              </a>
+            ) : canEdit ? (
+              <button type="button" className="btn small" onClick={() => setEditing(true)}>
+                <Pencil className="icon" /> Edit details
+              </button>
+            ) : null}
           </p>
+          {editing && <EditDetailsDialog row={row} onClose={() => setEditing(false)} onSave={(c) => { setEditing(false); onEdit(row, c); }} />}
 
           <h3>Photos &amp; videos ({row.media.length})</h3>
           {row.media.length > 0 ? (
@@ -177,7 +187,7 @@ export default function RowPanel({
                     <a className="icon-btn" href={`/api/media/${m.fileId}/download`} aria-label={`Download ${m.name}`} title="Download">
                       <Download className="icon" />
                     </a>
-                    {isAdmin && row.mediaFolderUrl && (
+                    {google && isAdmin && row.mediaFolderUrl && (
                       <a className="icon-btn" href={row.mediaFolderUrl} target="_blank" rel="noopener noreferrer" aria-label="Open in Drive" title="Open in Drive">
                         <ExternalLink className="icon" />
                       </a>
@@ -261,7 +271,9 @@ export default function RowPanel({
           <div className="storage-note">
             <Folder className="icon" />
             <span>
-              Saved to Google Drive › {rootFolderName} › {folderName}. Column K in the sheet links to this folder, so the sheet still shows that the row has media.
+              {google
+                ? `Saved to Google Drive › ${rootFolderName} › ${folderName}. Column K in the sheet links to this folder, so the sheet still shows that the row has media.`
+                : 'Files are stored on the tracker server and shown only to signed-in users.'}
             </span>
           </div>
 
@@ -287,5 +299,62 @@ export default function RowPanel({
         </div>
       </aside>
     </>
+  );
+}
+
+function EditDetailsDialog({ row, onClose, onSave }: { row: Row; onClose: () => void; onSave: (c: Record<string, string>) => void }) {
+  const [v, setV] = useState({ title: row.title, reportedDate: row.reportedDate, endDate: row.endDate, milestone: row.milestone, deliverable: row.deliverable, notes: row.notes });
+  const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setV({ ...v, [k]: e.target.value });
+  return (
+    <Dialog title={`Edit row ${row.rowNumber}`} onClose={onClose}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const changes: Record<string, string> = {};
+          (Object.keys(v) as (keyof typeof v)[]).forEach((k) => {
+            if (v[k] !== row[k]) changes[k] = v[k];
+          });
+          if (Object.keys(changes).length) onSave(changes);
+          else onClose();
+        }}
+      >
+        <div className="field">
+          <label htmlFor="ed-title">Bugs</label>
+          <textarea id="ed-title" className="input" value={v.title} onChange={set('title')} required maxLength={5000} />
+        </div>
+        <div className="two">
+          <div className="field">
+            <label htmlFor="ed-rd">Reported Date</label>
+            <input id="ed-rd" className="input mono" value={v.reportedDate} onChange={set('reportedDate')} placeholder="dd/mm/yyyy" required />
+          </div>
+          <div className="field">
+            <label htmlFor="ed-ed">End date</label>
+            <input id="ed-ed" className="input mono" value={v.endDate} onChange={set('endDate')} placeholder="dd/mm/yyyy" />
+          </div>
+        </div>
+        <div className="two">
+          <div className="field">
+            <label htmlFor="ed-ms">Milestone</label>
+            <input id="ed-ms" className="input" value={v.milestone} onChange={set('milestone')} maxLength={500} />
+          </div>
+          <div className="field">
+            <label htmlFor="ed-dl">Deliverable</label>
+            <input id="ed-dl" className="input" value={v.deliverable} onChange={set('deliverable')} maxLength={500} />
+          </div>
+        </div>
+        <div className="field">
+          <label htmlFor="ed-notes">Notes</label>
+          <textarea id="ed-notes" className="input" value={v.notes} onChange={set('notes')} maxLength={5000} />
+        </div>
+        <div className="row-btns">
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="btn primary">
+            Save
+          </button>
+        </div>
+      </form>
+    </Dialog>
   );
 }

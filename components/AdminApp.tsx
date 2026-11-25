@@ -7,6 +7,7 @@ import { AppIcon, ConfirmDialog, Dialog, ToastProvider, api, useToast } from './
 
 interface Status {
   demo: boolean;
+  mode: 'demo' | 'local' | 'google';
   google: { configured: boolean; connected: boolean; email: string | null; scopes: string[]; connectedAt: string | null; lostError: string | null; redirectUri: string };
   checks: { step: string; label: string; ok: boolean; detail?: string }[];
   health: { syncedAt: string | null; error: string | null; queue: number; disk: { freeMb: number; totalMb: number } | null; failedUploads: number };
@@ -157,8 +158,10 @@ function Admin({ me }: { me: { username: string; displayName: string } }) {
           <p className="muted">Loading…</p>
         ) : (
           <>
+            {st.mode === 'google' ? (
+              <>
             <section className="section" aria-labelledby="g-h">
-              <h2 id="g-h">1 · Google connection</h2>
+              <h2 id="g-h">Google connection</h2>
               {st.demo ? (
                 <p className="muted">Demo mode – Google is not used on this server.</p>
               ) : (
@@ -208,7 +211,7 @@ function Admin({ me }: { me: { username: string; displayName: string } }) {
 
             <section className="section" aria-labelledby="s-h">
               <h2 id="s-h">
-                2 · Setup checks{' '}
+                Setup checks{' '}
                 <button type="button" className="btn small ghost" onClick={() => act('reload', async () => undefined)} aria-label="Re-run checks">
                   <RefreshCw className="icon" />
                 </button>
@@ -241,8 +244,13 @@ function Admin({ me }: { me: { username: string; displayName: string } }) {
               </div>
             </section>
 
+              </>
+            ) : (
+              <DataSection demo={st.demo} act={act} />
+            )}
+
             <section className="section" aria-labelledby="u-h">
-              <h2 id="u-h">3 · Users</h2>
+              <h2 id="u-h">Users</h2>
               <div className="btn-row" style={{ marginBottom: 10 }}>
                 <button type="button" className="btn primary" onClick={() => setAddOpen(true)}>
                   Add user
@@ -392,7 +400,7 @@ function Admin({ me }: { me: { username: string; displayName: string } }) {
             <PeopleSection sheet={sheet} unknownNames={unknownNames} act={act} />
 
             <section className="section" aria-labelledby="set-h">
-              <h2 id="set-h">5 · Settings</h2>
+              <h2 id="set-h">Settings</h2>
               <form
                 className="btn-row"
                 style={{ alignItems: 'flex-end' }}
@@ -412,7 +420,7 @@ function Admin({ me }: { me: { username: string; displayName: string } }) {
             </section>
 
             <section className="section" aria-labelledby="m-h">
-              <h2 id="m-h">6 · Maintenance</h2>
+              <h2 id="m-h">Maintenance</h2>
               <div className="btn-row">
                 <button type="button" className="btn" disabled={busy !== null} onClick={() => act('rebuild', async () => { const r = await api<{ files: number; rows: number }>('POST', '/api/admin/media/rebuild'); toast(`Found ${r.files} files on ${r.rows} rows.`); })}>
                   {busy === 'rebuild' ? 'Scanning…' : 'Rebuild media index'}
@@ -427,7 +435,7 @@ function Admin({ me }: { me: { username: string; displayName: string } }) {
             </section>
 
             <section className="section" aria-labelledby="h-h">
-              <h2 id="h-h">7 · Health</h2>
+              <h2 id="h-h">Health</h2>
               <dl className="kv">
                 <dt>Last sync</dt>
                 <dd>{fmt(st.health.syncedAt)}</dd>
@@ -546,8 +554,8 @@ function PeopleSection({ sheet, unknownNames, act }: { sheet: SheetLite | null; 
   const people = sheet?.people ?? [];
   return (
     <section className="section" aria-labelledby="p-h">
-      <h2 id="p-h">4 · People (names for Reported By and Bug Owner)</h2>
-      <p className="sub">This is the People tab in the sheet. It is not the list of logins.</p>
+      <h2 id="p-h">People (names for Reported By and Bug Owner)</h2>
+      <p className="sub">The names offered in the Reported By and Bug Owner pickers. This is not the list of logins.</p>
       <div className="table-wrap">
         <table className="plain">
           <thead>
@@ -692,5 +700,64 @@ function MergeDialog({ p, people, onClose, act }: { p: Person; people: Person[];
         </div>
       </form>
     </Dialog>
+  );
+}
+
+function DataSection({ demo, act }: { demo: boolean; act: (label: string, fn: () => Promise<unknown>, ok?: string) => Promise<void> }) {
+  const toast = useToast();
+  const [file, setFile] = useState<File | null>(null);
+  const [mode, setMode] = useState<'replace' | 'append'>('append');
+  const [confirm, setConfirm] = useState(false);
+  async function run() {
+    if (!file) return;
+    await act('import', async () => {
+      const r = await fetch(`/api/admin/import?mode=${mode}`, { method: 'POST', headers: { 'Content-Type': 'text/csv' }, body: await file.text() });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.message || 'Import failed.');
+      toast(`Imported ${j.imported} rows (now ${j.total}). ${j.namesAdded ? `${j.namesAdded} new names added to People.` : ''}`);
+    });
+  }
+  return (
+    <section className="section" aria-labelledby="d-h">
+      <h2 id="d-h">Data</h2>
+      <p className="sub">
+        {demo
+          ? 'Demo mode: data is kept in memory only.'
+          : 'Rows, names and the change log are stored in the tracker database on this server; photos and videos on its disk. Google is not used.'}
+      </p>
+      <div className="btn-row" style={{ alignItems: 'center', marginBottom: 14 }}>
+        <a className="btn" href="/api/export" download>
+          Export all rows (CSV)
+        </a>
+        <span className="muted" style={{ fontSize: 12.5 }}>Opens in Excel or Google Sheets.</span>
+      </div>
+      <h3 style={{ fontSize: 13, margin: '0 0 8px' }}>Import rows from CSV</h3>
+      <p className="sub" style={{ margin: '0 0 10px' }}>
+        In Google Sheets use File → Download → Comma-separated values. The first row must be the header (Bugs, Priority, Reported By, Status, Reported Date, End date, Milestone, Bug Owner, Deliverable, Notes). New names in Reported By / Bug Owner are added to People.
+      </p>
+      <div className="btn-row" style={{ alignItems: 'center' }}>
+        <input type="file" accept=".csv,text/csv" aria-label="CSV file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        <select className="input" style={{ width: 'auto', minHeight: 32 }} value={mode} onChange={(e) => setMode(e.target.value as 'replace' | 'append')} aria-label="Import mode">
+          <option value="append">Add to the existing rows</option>
+          <option value="replace">Replace all rows</option>
+        </select>
+        <button type="button" className="btn primary" disabled={!file} onClick={() => (mode === 'replace' ? setConfirm(true) : void run())}>
+          Import
+        </button>
+      </div>
+      {confirm && (
+        <ConfirmDialog
+          title="Replace all rows"
+          message="All current rows are replaced by the rows in the file. Photos and videos stay attached to rows whose date and text are unchanged. Continue?"
+          confirmLabel="Replace rows"
+          danger
+          onCancel={() => setConfirm(false)}
+          onConfirm={async () => {
+            setConfirm(false);
+            await run();
+          }}
+        />
+      )}
+    </section>
   );
 }

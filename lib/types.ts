@@ -118,7 +118,7 @@ export interface SheetPayload {
   stats: Stats;
   people: Person[];
   me: { name: string; role: Role; username: string; displayName: string };
-  sync: { ok: boolean; error: string | null; googleConnected: boolean; demo: boolean };
+  sync: { ok: boolean; error: string | null; googleConnected: boolean; demo: boolean; mode: 'demo' | 'local' | 'google' };
   sheetGid: number | null;
   sheetId: string;
   openStatuses: string[];

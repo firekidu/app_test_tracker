@@ -11,6 +11,12 @@ const Body = z.object({
     priority: z.string().optional(),
     reporter: z.string().max(120).optional(),
     owner: z.string().max(120).optional(),
+    title: z.string().max(5000).optional(),
+    reportedDate: z.string().max(20).optional(),
+    endDate: z.string().max(20).optional(),
+    milestone: z.string().max(500).optional(),
+    deliverable: z.string().max(500).optional(),
+    notes: z.string().max(5000).optional(),
   }),
 });
 
