@@ -79,6 +79,15 @@ if [ ! -f "$SRC_TGZ" ]; then
   log "Downloading $BRANCH from GitHub"
   curl -fsSL -o "$SRC_TGZ" "https://codeload.github.com/firekidu/app_test_tracker/tar.gz/refs/heads/$BRANCH"
 fi
+# Which commit is this? (Actions passes APP_VERSION; a manual run asks GitHub for the branch head.)
+if [ -z "${APP_VERSION:-}" ]; then
+  APP_VERSION=$(gzip -dc "$SRC_TGZ" | git get-tar-commit-id 2>/dev/null || true)
+fi
+if [ -z "${APP_VERSION:-}" ]; then
+  APP_VERSION=$(curl -fsSL "https://api.github.com/repos/firekidu/app_test_tracker/commits/${BRANCH:-claude/relaxed-einstein-1xpirl}" 2>/dev/null | grep -m1 -oE '"sha": *"[0-9a-f]{40}"' | grep -oE '[0-9a-f]{40}' || true)
+fi
+export APP_VERSION="${APP_VERSION:-unknown}"
+log "Release: $APP_VERSION"
 # GitHub's own archives wrap everything in one top-level folder; strip it when there is no Dockerfile at the root.
 STRIP=0
 if ! tar -tzf "$SRC_TGZ" | grep -qx 'Dockerfile'; then STRIP=1; fi
@@ -194,4 +203,4 @@ as_root chmod 644 /etc/cron.d/smprd-backup
 $DOCKER exec smprd-app-1 node scripts/backup.mjs && $DOCKER cp smprd-app-1:/data/backups/. "$BASE/backups/" >/dev/null && echo "Backup OK: $(as_root ls "$BASE/backups" | tail -1)"
 
 $DOCKER image prune -f >/dev/null 2>&1 || true
-log "Deployed: https://$APP_DOMAIN"
+log "Deployed: https://$APP_DOMAIN (commit $APP_VERSION)"

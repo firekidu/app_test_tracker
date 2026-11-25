@@ -123,6 +123,7 @@ jobs:
             printf 'GOOGLE_CLIENT_ID=%q\n' "$GOOGLE_CLIENT_ID"
             printf 'GOOGLE_CLIENT_SECRET=%q\n' "$GOOGLE_CLIENT_SECRET"
             printf 'SUDO_PASSWORD=%q\n' "${SSHPASS:-}"
+            printf 'APP_VERSION=%q\n' "$GITHUB_SHA"
           } > deploy.env
           ssh_ 'umask 077; cat > /tmp/smprd-deploy.env' < deploy.env
           rm -f deploy.env

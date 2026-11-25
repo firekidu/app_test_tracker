@@ -4,7 +4,10 @@ name: smprd
 
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
     image: smprd-tracker:latest
     restart: unless-stopped
     env_file: .env

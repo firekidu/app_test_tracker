@@ -22,6 +22,12 @@ jobs:
       - name: Health (certificate checked)
         continue-on-error: true
         run: curl -sS -m 20 -w '\nHTTP %{http_code}\n' "$SITE/api/health"
+      - name: Live version matches GitHub
+        run: |
+          live=$(curl -sS -k -m 20 "$SITE/api/health" | jq -r '.version // "not reported (deployed before version stamping)"')
+          echo "GitHub ($GITHUB_REF_NAME): $GITHUB_SHA"
+          echo "Live site:                 $live"
+          if [ "$live" = "$GITHUB_SHA" ]; then echo "MATCH – the live site runs the latest commit."; else echo "::error title=MISMATCH::The live site is not running the latest commit ($GITHUB_SHA). Run the deploy again."; exit 1; fi
       - name: What the proxy answers (certificate not checked, HTTPS and HTTP)
         run: |
           http="http://${SITE#https://}"

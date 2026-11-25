@@ -13,9 +13,11 @@ RUN npm ci
 FROM node:26-slim AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+# Git commit this image is built from (shown by /api/health so the live site can be compared with GitHub).
+ARG APP_VERSION=dev
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+RUN npm run build && printf '%s\n' "$APP_VERSION" > /app/RELEASE
 
 # ---- run ----
 FROM node:26-slim AS run
@@ -37,6 +39,7 @@ COPY --from=build --chown=app:app /app/.next/static ./.next/static
 COPY --from=build --chown=app:app /app/public ./public
 COPY --from=build --chown=app:app /app/db ./db
 COPY --from=build --chown=app:app /app/scripts ./scripts
+COPY --from=build --chown=app:app /app/RELEASE ./RELEASE
 USER app
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
