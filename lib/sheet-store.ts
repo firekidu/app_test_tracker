@@ -148,6 +148,27 @@ function parseChangeLog(grid: string[][]): ChangeLogEntry[] {
     }));
 }
 
+/** "Name (username)" – who made a change, as written to the Change log. */
+export function actorLabel(a: { personName?: string; displayName: string; username: string }) {
+  const name = a.personName || a.displayName;
+  return a.username && a.username !== name ? `${name} (${a.username})` : name;
+}
+
+function editsByKey(): Map<string, Record<string, { by: string; at: string }>> {
+  const m = new Map<string, Record<string, { by: string; at: string }>>();
+  for (const e of S().changeLog) {
+    if (!e.rowKey || !e.field) continue;
+    const rec = m.get(e.rowKey) ?? {};
+    rec[e.field] = { by: e.by, at: e.timestamp }; // later lines overwrite earlier ones
+    m.set(e.rowKey, rec);
+  }
+  return m;
+}
+
+export function allChanges(): ChangeLogEntry[] {
+  return S().changeLog.slice().reverse();
+}
+
 function lastChangeByKey(): Map<string, string> {
   const m = new Map<string, string>();
   for (const e of S().changeLog) {
@@ -329,6 +350,7 @@ export async function snapshot(): Promise<Snapshot> {
     lastChangeByKey: lastChangeByKey(),
     mediaByKey: byKey,
     mediaByFolder: byFolder,
+    editsByKey: editsByKey(),
     stallDays: Number(getSetting('stallDays') ?? c.STALL_DAYS),
     today: todayIso(c.TZ),
   });
@@ -439,6 +461,7 @@ export interface RowChanges {
 function normDate(v: string, field: string): string {
   const t = v.trim();
   if (!t) return '';
+  if (!/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(t)) throw new HttpError(422, `${field}: use dd/mm/yyyy.`);
   const iso = parseUkDate(t);
   if (!iso) throw new HttpError(422, `${field}: use dd/mm/yyyy.`);
   return isoToUk(iso);
@@ -457,7 +480,7 @@ export function updateRow(n: number, key: string, changes: RowChanges, actor: Ac
     const v = [...r.values];
     const updates: { range: string; values: string[][] }[] = [];
     const lines: string[][] = [];
-    const by = actor.personName || actor.displayName;
+    const by = actorLabel(actor);
     const set = (col: number, letter: string, field: string, val: string) => {
       if ((v[col] ?? '').trim() === val.trim()) return;
       updates.push({ range: rng(c.SHEET_TAB, `${letter}${r.n}`), values: [[val]] });
@@ -537,7 +560,7 @@ export function addRow(input: NewRow, actor: Actor) {
     const n = (await sheets().append(rng(c.SHEET_TAB, 'A:K'), [values])) ?? ((S().raw ?? []).reduce((m, r) => Math.max(m, r.rowNumber), 1) + 1);
     applyLocal(n, values);
     const key = rowKeyFromValues(values);
-    await appendChangeLog([logLine(n, key, values[0], 'Row added', '', values[0].slice(0, 80), actor.personName || actor.displayName)]);
+    await appendChangeLog([logLine(n, key, values[0], 'Row added', '', values[0].slice(0, 80), actorLabel(actor))]);
     bumpVersion();
     return { rowNumber: n, rowKey: key };
   });
@@ -597,7 +620,7 @@ export function addPerson(nameIn: string, spellingsIn: string[], actor: Actor) {
     const row = await sheets().append(rng(c.PEOPLE_TAB, 'A:E'), [[name, spellings.join(', '), 'TRUE', by, today]]);
     const person: Person = { name, spellings, active: true, addedBy: by, addedOn: today, sheetRow: row ?? undefined };
     s.people.push(person);
-    await appendChangeLog([[ukTimestamp(c.TZ), '', '', '', 'Name added', '', name, actor.personName || by, 'App', spellings.length ? `Spellings: ${spellings.join(', ')}` : '']]);
+    await appendChangeLog([[ukTimestamp(c.TZ), '', '', '', 'Name added', '', name, actorLabel(actor), 'App', spellings.length ? `Spellings: ${spellings.join(', ')}` : '']]);
     bumpVersion();
     return person;
   });
@@ -620,7 +643,7 @@ export function updatePerson(name: string, patch: PersonPatch, actor: Actor) {
     s.people = parsePeopleGrid(grid);
     const p = s.people.find((x) => normalizeText(x.name) === normalizeText(name));
     if (!p || !p.sheetRow) throw new HttpError(404, 'Name not found.');
-    const by = actor.personName || actor.displayName;
+    const by = actorLabel(actor);
     const lines: string[][] = [];
     const ts = ukTimestamp(c.TZ);
     if (patch.mergeInto) {
@@ -888,7 +911,7 @@ async function importUnlocked(grid: string[][], mode: 'replace' | 'append', by: 
 }
 
 export function importRows(grid: string[][], mode: 'replace' | 'append', actor: Actor) {
-  return withLock(() => importUnlocked(grid, mode, actor.personName || actor.displayName));
+  return withLock(() => importUnlocked(grid, mode, actorLabel(actor)));
 }
 
 export async function exportGrid(): Promise<string[][]> {
@@ -915,5 +938,24 @@ export function ensurePerson(name: string, by: string) {
   return withLock(async () => {
     await ensureFreshUnlocked();
     await ensurePersonUnlocked(name, by);
+  });
+}
+
+/** Remove a row (standalone mode). Returns the media ids that belonged to it, for the caller to delete. */
+export function deleteRow(n: number, key: string, actor: Actor) {
+  return withLock(async () => {
+    await ensureFreshUnlocked();
+    const c = config();
+    const be = sheets();
+    if (!c.standalone || !be.deleteRow) throw new HttpError(422, 'Delete rows in Google Sheets.');
+    const r = await resolveRow(n, key);
+    await be.deleteRow(c.SHEET_TAB, r.n);
+    const s = S();
+    await appendChangeLog([logLine(r.n, key, r.values[0], 'Row deleted', r.values[0].slice(0, 80), '', actorLabel(actor), `Status was ${r.values[3] || '—'}`)]);
+    s.raw = null; // reload without diffing: rows below moved up
+    await syncUnlocked();
+    bumpVersion();
+    const media = (db().prepare('SELECT file_id FROM media WHERE row_key = ?').all(key) as { file_id: string }[]).map((m) => m.file_id);
+    return { rowNumber: r.n, title: r.values[0], media };
   });
 }

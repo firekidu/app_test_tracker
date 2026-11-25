@@ -29,6 +29,7 @@ function parts(d: Date, tz: string) {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
     hour12: false,
   });
   const o: Record<string, string> = {};
@@ -42,11 +43,11 @@ export function todayIso(tz = 'Europe/London', now = new Date()): string {
   return `${p.year}-${p.month}-${p.day}`;
 }
 
-/** "24/11/2026 10:42" in the given zone. */
+/** "24/11/2026 10:42:07" in the given zone. */
 export function ukTimestamp(tz = 'Europe/London', now = new Date()): string {
   const p = parts(now, tz);
   const hh = p.hour === '24' ? '00' : p.hour;
-  return `${p.day}/${p.month}/${p.year} ${hh}:${p.minute}`;
+  return `${p.day}/${p.month}/${p.year} ${hh}:${p.minute}:${p.second}`;
 }
 
 /** Parse "24/11/2026 10:42" → ISO date part. */

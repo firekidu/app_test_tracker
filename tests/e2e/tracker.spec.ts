@@ -177,3 +177,60 @@ test('data survives a restart (SQLite)', async ({ request }) => {
   const r = await request.get('/api/health');
   expect((await r.json()).mode).toBe('local');
 });
+
+test('inline edit: End date, Milestone, Deliverable, Notes from the table, with who/when tooltip', async ({ page }) => {
+  await signIn(page, ADMIN, NEWPW);
+  const row = page.locator('tr[data-row="20"]');
+  await row.locator('button[aria-label^="Row 20 End date"]').click();
+  await page.keyboard.type('03/12/2026'); // existing text is selected, so typing replaces it
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.toast').first()).toContainText('Row 20: End date → 03/12/2026');
+  await row.locator('button[aria-label^="Row 20 Milestone"]').click();
+  await page.locator('input[aria-label="Row 20 Milestone"]').fill('M9');
+  await page.keyboard.press('Enter');
+  await row.locator('button[aria-label^="Row 20 Deliverable"]').click();
+  await page.locator('input[aria-label="Row 20 Deliverable"]').fill('Android app');
+  await page.keyboard.press('Tab'); // blur saves
+  await row.locator('button[aria-label^="Row 20 Notes"]').click();
+  await page.locator('textarea[aria-label="Row 20 Notes"]').fill('Checked on Pixel 8');
+  await page.keyboard.press('Enter');
+  await expect(row.locator('td').nth(6)).toHaveText('M9');
+  await expect(row.locator('td').nth(8)).toHaveText('Android app');
+  await expect(row.locator('td').nth(9)).toHaveText('Checked on Pixel 8');
+  await expect(row.locator('td').nth(6)).toHaveAttribute('title', /Last edited by David Thomas \(david\)|Last edited by .*\(david\)|Last edited by david · \d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}/);
+  // Esc cancels
+  await row.locator('button[aria-label^="Row 20 Milestone"]').click();
+  await page.locator('input[aria-label="Row 20 Milestone"]').fill('nope');
+  await page.keyboard.press('Escape');
+  await expect(row.locator('td').nth(6)).toHaveText('M9');
+});
+
+test('column header filters', async ({ page }) => {
+  await signIn(page, ADMIN, NEWPW);
+  await page.selectOption('select[aria-label="Filter Priority"]', 'High');
+  const n = await page.locator('table.sheet tbody tr').count();
+  expect(n).toBeGreaterThan(0);
+  for (const t of await page.locator('table.sheet tbody tr td:nth-of-type(2)').allInnerTexts()) expect(t).toContain('High');
+  await page.fill('input[aria-label="Filter Milestone"]', 'M9');
+  await expect(page.locator('table.sheet tbody tr')).toHaveCount(0);
+  await page.click('button[aria-label="Clear column filters"]');
+  await expect(page.locator('table.sheet tbody tr')).toHaveCount(87);
+  await page.selectOption('select[aria-label="Filter Bug Owner"]', '-');
+  for (const t of await page.locator('table.sheet tbody tr td:nth-of-type(8)').allInnerTexts()) expect(t.trim()).toBe('');
+});
+
+test('delete a row: confirmation, rows move up, logged in the Activity log', async ({ page }) => {
+  await signIn(page, ADMIN, NEWPW);
+  const title = await page.locator('tr[data-row="3"] .cell-title').innerText();
+  await page.locator('tr[data-row="3"]').hover();
+  await page.click('button[aria-label="Delete row 3"]');
+  await page.click('.dialog button:has-text("Delete row")');
+  await expect(page.locator('.toast').first()).toContainText('Row 3 deleted');
+  await expect(page.locator('table.sheet tbody tr')).toHaveCount(86);
+  await expect(page.locator('tr[data-row="3"] .cell-title')).not.toHaveText(title);
+  await page.goto('/activity');
+  await page.selectOption('select[aria-label="Field"]', 'Row deleted');
+  await expect(page.locator('table.activity tbody tr').first()).toContainText(title.slice(0, 30));
+  await expect(page.locator('table.activity tbody tr').first().locator('td').nth(6)).toHaveText(/david/);
+  await expect(page.locator('table.activity tbody tr').first().locator('td').first()).toHaveText(/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}/);
+});

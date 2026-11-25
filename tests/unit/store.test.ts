@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MemorySheets, setSheetsBackend } from '@/lib/google/sheets';
-import { CHANGELOG_HEADER, addRow, diffSnapshots, snapshot, sync, updateRow } from '@/lib/sheet-store';
+import { CHANGELOG_HEADER, addRow, deleteRow, diffSnapshots, snapshot, sync, updateRow } from '@/lib/sheet-store';
 import { gridToRawRows, rowKey } from '@/lib/rows';
 import { PEOPLE_HEADER } from '@/lib/people';
 import { fixtureGrid } from './helpers';
@@ -74,6 +74,30 @@ describe('sheet store (4.6 row identity, M2 edits)', () => {
     const s = await snapshot();
     const r = s.rows[0];
     await expect(updateRow(r.rowNumber, r.rowKey, { owner: 'Stranger' }, actor)).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('edits text and dates; rejects malformed dates', async () => {
+    const s = await snapshot();
+    const r = s.rows.find((x) => x.rowNumber === 20)!;
+    await expect(updateRow(20, r.rowKey, { endDate: '19/02/202603/12/2026' }, actor)).rejects.toMatchObject({ status: 422 });
+    const res = await updateRow(20, r.rowKey, { endDate: '3/12/2026', milestone: 'M9', notes: 'n1' }, actor);
+    expect(res.changed.map((c) => c.field).sort()).toEqual(['End date', 'Milestone', 'Notes']);
+    expect(mem.tabs.get('Sheet1')!.grid[19][5]).toBe('03/12/2026');
+    const after = (await snapshot()).rows.find((x) => x.rowNumber === 20)!;
+    expect(after.edits['Milestone'].by).toBe('David Thomas (david)');
+    expect(after.edits['Milestone'].at).toMatch(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}$/);
+  });
+
+  it('deletes a row; rows below move up; logged', async () => {
+    const s = await snapshot();
+    const r5 = s.rows.find((x) => x.rowNumber === 5)!;
+    const r6title = s.rows.find((x) => x.rowNumber === 6)!.title;
+    const res = await deleteRow(5, r5.rowKey, actor);
+    expect(res.rowNumber).toBe(5);
+    const s2 = await snapshot();
+    expect(s2.rows).toHaveLength(85);
+    expect(s2.rows.find((x) => x.rowNumber === 5)!.title).toBe(r6title);
+    expect(mem.tabs.get('Change log')!.grid.at(-1)![4]).toBe('Row deleted');
   });
 
   it('adds a row', async () => {

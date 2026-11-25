@@ -6,6 +6,9 @@ import {
   ChevronDown,
   Download,
   ExternalLink,
+  Filter,
+  History,
+  Loader2,
   Image as ImageIcon,
   KeyRound,
   LogOut,
@@ -15,7 +18,9 @@ import {
   Search,
   Settings,
   User,
+  Trash2,
   Video,
+  X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MediaSummary, Row, SheetPayload } from '@/lib/types';
@@ -133,6 +138,7 @@ function Tracker() {
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [addOpen, setAddOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState<MediaSummary | null>(null);
+  const [confirmRowDel, setConfirmRowDel] = useState<Row | null>(null);
   const [highlight, setHighlight] = useState<number | null>(null);
   const uploads = useUploads({ maxMb: data?.maxUploadMb ?? 100, onDone: () => void refresh(true), toast });
 
@@ -231,6 +237,20 @@ function Tracker() {
     }
   }
 
+  async function doDeleteRow(r: Row) {
+    try {
+      const res = await api<{ deleted: number; mediaRemoved: number }>('DELETE', `/api/rows/${r.rowNumber}`, { rowKey: r.rowKey });
+      toast(`Row ${res.deleted} deleted${res.mediaRemoved ? ` with ${res.mediaRemoved} file${res.mediaRemoved > 1 ? 's' : ''}` : ''}.`);
+      if (f.row) update({ row: null, media: null });
+      await refresh(true);
+    } catch (e) {
+      toast((e as Error).message, true);
+      if ((e as { status?: number }).status === 409) await refresh(true);
+    } finally {
+      setConfirmRowDel(null);
+    }
+  }
+
   async function saveCaption(m: MediaSummary, caption: string) {
     try {
       await api('PATCH', `/api/media/${m.fileId}`, { caption });
@@ -297,6 +317,7 @@ function Tracker() {
               onOpen={openRow}
               onMedia={openMedia}
               onEdit={edit}
+              onDelete={(r) => setConfirmRowDel(r)}
             />
           </>
         )}
@@ -310,6 +331,7 @@ function Tracker() {
           isAdmin={!!isAdmin}
           sheetLink={rowLink(panelRow.rowNumber)}
           google={google}
+          onDeleteRow={!google && canEdit ? () => setConfirmRowDel(panelRow) : undefined}
           uploads={uploads}
           busy={busy}
           onClose={() => update({ row: null, media: null })}
@@ -343,6 +365,16 @@ function Tracker() {
           danger
           onCancel={() => setConfirmDel(null)}
           onConfirm={() => doDelete(confirmDel)}
+        />
+      )}
+      {confirmRowDel && (
+        <ConfirmDialog
+          title={`Delete row ${confirmRowDel.rowNumber}`}
+          message={`Delete “${confirmRowDel.title.slice(0, 120)}”${confirmRowDel.media.length ? ` and its ${confirmRowDel.media.length} photo/video file${confirmRowDel.media.length > 1 ? 's' : ''}` : ''}? Rows below move up by one. The deletion is recorded in the Activity log. This cannot be undone.`}
+          confirmLabel="Delete row"
+          danger
+          onCancel={() => setConfirmRowDel(null)}
+          onConfirm={() => doDeleteRow(confirmRowDel)}
         />
       )}
       {addOpen && (
@@ -420,6 +452,9 @@ function AccountMenu({ data }: { data: SheetPayload }) {
               <Settings className="icon" /> Admin
             </a>
           )}
+          <a href="/activity" role="menuitem">
+            <History className="icon" /> Activity log
+          </a>
           <a href="/account/password" role="menuitem">
             <KeyRound className="icon" /> Change password
           </a>
@@ -675,7 +710,7 @@ const COLS: { letter: string; name: string; w: number; isNew?: boolean }[] = [
   { letter: 'C', name: 'Reported By', w: 104 },
   { letter: 'D', name: 'Status', w: 186 },
   { letter: 'E', name: 'Reported Date', w: 98 },
-  { letter: 'F', name: 'End date', w: 78 },
+  { letter: 'F', name: 'End date', w: 96 },
   { letter: 'G', name: 'Milestone', w: 86 },
   { letter: 'H', name: 'Bug Owner', w: 100 },
   { letter: 'I', name: 'Deliverable', w: 90 },
@@ -712,6 +747,7 @@ function SheetTable({
   onOpen,
   onMedia,
   onEdit,
+  onDelete,
 }: {
   data: SheetPayload;
   rows: Row[];
@@ -721,7 +757,20 @@ function SheetTable({
   onOpen: (n: number) => void;
   onMedia: (r: Row, m: MediaSummary) => void;
   onEdit: (r: Row, c: Record<string, string>) => void;
+  onDelete: (r: Row) => void;
 }) {
+  const [cf, setCf] = useState<Record<string, string>>({});
+  const standalone = data.sync.mode !== 'google';
+  const textEdit = canEdit && standalone;
+  const allRows = rows;
+  rows = useMemo(() => filterByColumns(allRows, cf), [allRows, cf]);
+  const anyFilter = Object.values(cf).some(Boolean);
+  const names = useMemo(() => [...new Set(allRows.flatMap((r) => [r.reporter, r.owner]).filter(Boolean))].sort(), [allRows]);
+  const statuses = useMemo(() => [...new Set(allRows.map((r) => r.status).filter(Boolean))].sort(), [allRows]);
+  const tip = (r: Row, field: string) => {
+    const e = r.edits?.[field];
+    return e ? `Last edited by ${e.by} · ${e.at}` : undefined;
+  };
   const nums = rows.map((r) => r.rowNumber);
   const a = nums.length ? Math.min(...nums) : 0;
   const b = nums.length ? Math.max(...nums) : 0;
@@ -755,12 +804,60 @@ function SheetTable({
                 </th>
               ))}
             </tr>
+            <tr className="filters">
+              <th className="rn">
+                {anyFilter ? (
+                  <button type="button" className="icon-btn plain" style={{ width: 26, height: 26 }} onClick={() => setCf({})} aria-label="Clear column filters" title="Clear column filters">
+                    <X className="icon" />
+                  </button>
+                ) : (
+                  <Filter className="icon" aria-hidden style={{ color: 'var(--muted)', width: 13, height: 13 }} />
+                )}
+              </th>
+              {COLS.map((c) => {
+                const set = (v: string) => setCf((f) => ({ ...f, [c.letter]: v }));
+                const v = cf[c.letter] ?? '';
+                const sel = (opts: { v: string; l: string }[]) => (
+                  <select className="col-filter" value={v} onChange={(e) => set(e.target.value)} aria-label={`Filter ${c.name}`}>
+                    <option value="">All</option>
+                    {opts.map((o) => (
+                      <option key={o.v} value={o.v}>
+                        {o.l}
+                      </option>
+                    ))}
+                  </select>
+                );
+                return (
+                  <th key={c.letter}>
+                    {c.letter === 'B'
+                      ? sel(PRIORITIES.map((p) => ({ v: p, l: p })))
+                      : c.letter === 'D'
+                        ? sel(statuses.map((x) => ({ v: x, l: statusLabel(x) })))
+                        : c.letter === 'C' || c.letter === 'H'
+                          ? sel([...(c.letter === 'H' ? [{ v: '-', l: 'No owner' }] : []), ...names.map((n) => ({ v: n, l: n }))])
+                          : c.letter === 'K'
+                            ? sel([
+                                { v: 'yes', l: 'Has media' },
+                                { v: 'no', l: 'No media' },
+                              ])
+                            : (
+                              <input className={`col-filter${v ? ' on' : ''}`} value={v} onChange={(e) => set(e.target.value)} placeholder={c.letter === 'E' || c.letter === 'F' ? 'dd/mm/yyyy' : 'Filter…'} aria-label={`Filter ${c.name}`} />
+                            )}
+                  </th>
+                );
+              })}
+            </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <tr key={`${r.rowNumber}-${r.rowKey}`} data-row={r.rowNumber} className={highlight === r.rowNumber ? 'hl' : ''}>
                 <th className="rn" scope="row">
                   {r.rowNumber}
+                  {textEdit && (
+                    <button type="button" className="row-del" onClick={() => onDelete(r)} aria-label={`Delete row ${r.rowNumber}`} title="Delete row">
+                      <Trash2 className="icon" />
+                    </button>
+                  )}
                   {r.duplicate && (
                     <div>
                       <span className="dup" title="Possible duplicate: another row has the same date and text. Edits are blocked until one is changed in Sheets.">
@@ -769,40 +866,28 @@ function SheetTable({
                     </div>
                   )}
                 </th>
-                <td>
+                <td title={tip(r, 'Bugs')}>
                   <button type="button" className="cell-title clamp2" onClick={() => onOpen(r.rowNumber)} title={r.title}>
                     {r.title}
                   </button>
                 </td>
-                <td>
+                <td title={tip(r, 'Priority')}>
                   <ChipSelect label={`Row ${r.rowNumber} priority`} value={r.priority} options={PRIORITIES} disabled={!canEdit} busy={busy[`${r.rowNumber}:priority`]} onChange={(v) => onEdit(r, { priority: v })} render={(v, o) => <PriorityChip priority={v} caret={o.caret} busy={o.busy} />} />
                 </td>
-                <td>
+                <td title={tip(r, 'Reported By')}>
                   <NamePicker label={`Row ${r.rowNumber} Reported By`} value={r.reporter} raw={r.reporterRaw} known={r.reporterKnown} people={data.people} meName={data.me.name} disabled={!canEdit} busy={busy[`${r.rowNumber}:reporter`]} onChoose={(n) => onEdit(r, { reporter: n })} />
                 </td>
-                <td>
+                <td title={tip(r, 'Status')}>
                   <ChipSelect label={`Row ${r.rowNumber} status`} value={r.status} options={STATUS_EDIT_ORDER} disabled={!canEdit} busy={busy[`${r.rowNumber}:status`]} onChange={(v) => onEdit(r, { status: v })} render={(v, o) => <StatusChip status={v} caret={o.caret} busy={o.busy} />} />
                 </td>
-                <td className="mono" style={{ fontSize: 12.5 }}>
-                  {r.reportedDate}
-                </td>
-                <td className="mono" style={{ fontSize: 12.5 }}>
-                  {r.endDate}
-                </td>
-                <td>
-                  <span className="clamp2">{r.milestone}</span>
-                </td>
-                <td>
+                <EditableCell kind="date" value={r.reportedDate} label={`Row ${r.rowNumber} Reported Date`} disabled={!textEdit} busy={busy[`${r.rowNumber}:reportedDate`]} title={tip(r, 'Reported Date')} onSave={(v) => onEdit(r, { reportedDate: v })} />
+                <EditableCell kind="date" value={r.endDate} label={`Row ${r.rowNumber} End date`} disabled={!textEdit} busy={busy[`${r.rowNumber}:endDate`]} title={tip(r, 'End date')} onSave={(v) => onEdit(r, { endDate: v })} />
+                <EditableCell kind="text" value={r.milestone} label={`Row ${r.rowNumber} Milestone`} disabled={!textEdit} busy={busy[`${r.rowNumber}:milestone`]} title={tip(r, 'Milestone')} onSave={(v) => onEdit(r, { milestone: v })} />
+                <td title={tip(r, 'Bug Owner')}>
                   <NamePicker label={`Row ${r.rowNumber} Bug Owner`} value={r.owner} raw={r.ownerRaw} known={r.ownerKnown} people={data.people} meName={data.me.name} allowNone disabled={!canEdit} busy={busy[`${r.rowNumber}:owner`]} onChoose={(n) => onEdit(r, { owner: n })} />
                 </td>
-                <td>
-                  <span className="clamp2">{r.deliverable}</span>
-                </td>
-                <td className="notes">
-                  <span className="clamp2" title={r.notes}>
-                    {r.notes}
-                  </span>
-                </td>
+                <EditableCell kind="text" value={r.deliverable} label={`Row ${r.rowNumber} Deliverable`} disabled={!textEdit} busy={busy[`${r.rowNumber}:deliverable`]} title={tip(r, 'Deliverable')} onSave={(v) => onEdit(r, { deliverable: v })} />
+                <EditableCell kind="long" className="notes" value={r.notes} label={`Row ${r.rowNumber} Notes`} disabled={!textEdit} busy={busy[`${r.rowNumber}:notes`]} title={tip(r, 'Notes') ?? r.notes} onSave={(v) => onEdit(r, { notes: v })} />
                 <td>
                   <div className="media-cell">
                     {r.media.length ? (
@@ -826,7 +911,7 @@ function SheetTable({
             ))}
           </tbody>
         </table>
-        {!rows.length && <div className="empty">{data.rows.length ? 'No rows match these filters.' : data.sync.googleConnected ? (data.me.role === 'admin' && data.sync.mode !== 'google' ? 'No rows yet. Use “Add row”, or import your existing sheet as CSV in Admin → Data.' : 'No rows yet.') : 'Google is not connected yet, so there is no sheet to show.'}</div>}
+        {!rows.length && <div className="empty">{data.rows.length ? `No rows match these filters.${anyFilter ? ' Clear the column filters with ✕ at the top left.' : ''}` : data.sync.googleConnected ? (data.me.role === 'admin' && data.sync.mode !== 'google' ? 'No rows yet. Use “Add row”, or import your existing sheet as CSV in Admin → Data.' : 'No rows yet.') : 'Google is not connected yet, so there is no sheet to show.'}</div>}
       </div>
       <div className="table-foot">
         <span>
@@ -835,6 +920,97 @@ function SheetTable({
         <span>{data.sync.mode === 'google' ? 'Edits here write back to Sheet1 · files are stored in Google Drive' : 'Saved in the tracker database · files are stored on the server'}</span>
       </div>
     </div>
+  );
+}
+
+function filterByColumns(rows: Row[], cf: Record<string, string>): Row[] {
+  const active = Object.entries(cf).filter(([, v]) => v);
+  if (!active.length) return rows;
+  const has = (hay: string, n: string) => hay.toLowerCase().includes(n.trim().toLowerCase());
+  return rows.filter((r) =>
+    active.every(([col, v]) => {
+      switch (col) {
+        case 'A': return has(r.title, v);
+        case 'B': return r.priority === v;
+        case 'C': return r.reporter === v;
+        case 'D': return r.status === v;
+        case 'E': return has(r.reportedDate, v);
+        case 'F': return has(r.endDate, v);
+        case 'G': return has(r.milestone, v);
+        case 'H': return v === '-' ? !r.ownerRaw.trim() : r.owner === v;
+        case 'I': return has(r.deliverable, v);
+        case 'J': return has(r.notes, v);
+        case 'K': return v === 'yes' ? r.media.length > 0 : r.media.length === 0;
+        default: return true;
+      }
+    }),
+  );
+}
+
+/** A table cell you can click to edit in place. Enter saves, Esc cancels, clicking away saves. */
+function EditableCell({ value, onSave, kind, label, disabled, busy, title, className }: { value: string; onSave: (v: string) => void; kind: 'text' | 'date' | 'long'; label: string; disabled?: boolean; busy?: boolean; title?: string; className?: string }) {
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState(value);
+  const cls = `${className ?? ''}${kind === 'date' ? ' mono' : ''}`;
+  const done = (save: boolean) => {
+    setEditing(false);
+    if (save && v.trim() !== value.trim()) onSave(v.trim());
+  };
+  if (disabled)
+    return (
+      <td className={cls} style={kind === 'date' ? { fontSize: 12.5 } : undefined} title={title}>
+        {kind === 'date' ? value : <span className="clamp2">{value}</span>}
+      </td>
+    );
+  return (
+    <td className={`${cls} editable${busy ? ' busy' : ''}`} style={kind === 'date' ? { fontSize: 12.5 } : undefined} title={editing ? undefined : title}>
+      {editing ? (
+        kind === 'long' ? (
+          <textarea
+            className="cell-input"
+            autoFocus
+            rows={3}
+            value={v}
+            onFocus={(e) => e.target.select()}
+            aria-label={label}
+            onChange={(e) => setV(e.target.value)}
+            onBlur={() => done(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { setV(value); done(false); }
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); done(true); }
+            }}
+          />
+        ) : (
+          <input
+            className="cell-input"
+            autoFocus
+            value={v}
+            aria-label={label}
+            placeholder={kind === 'date' ? 'dd/mm/yyyy' : ''}
+            inputMode={kind === 'date' ? 'numeric' : undefined}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => setV(e.target.value)}
+            onBlur={() => done(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { setV(value); done(false); }
+              if (e.key === 'Enter') { e.preventDefault(); done(true); }
+            }}
+          />
+        )
+      ) : (
+        <button
+          type="button"
+          className="cell-edit"
+          aria-label={`${label}: ${value || 'empty'}. Edit`}
+          onClick={() => {
+            setV(value);
+            setEditing(true);
+          }}
+        >
+          {busy ? <Loader2 className="icon spin" /> : value ? (kind === 'date' ? value : <span className="clamp2">{value}</span>) : <span className="cell-empty">+</span>}
+        </button>
+      )}
+    </td>
   );
 }
 

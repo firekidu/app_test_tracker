@@ -62,6 +62,7 @@ export interface BuildOptions {
   lastChangeByKey: Map<string, string>; // rowKey → ISO date of latest change
   mediaByKey: Map<string, MediaSummary[]>;
   mediaByFolder?: Map<string, MediaSummary[]>;
+  editsByKey?: Map<string, Record<string, { by: string; at: string }>>;
   stallDays: number;
   today: string; // ISO
 }
@@ -107,6 +108,7 @@ export function buildRows(raw: RawRow[], o: BuildOptions): Row[] {
       stalled,
       stalledDays: stalled ? stalledDays : 0,
       duplicate: (keyCount.get(key) ?? 0) > 1,
+      edits: o.editsByKey?.get(key) ?? {},
     };
   });
 }

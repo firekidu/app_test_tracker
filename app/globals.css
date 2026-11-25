@@ -363,3 +363,23 @@ table.plain th { font-size: 12px; color: var(--muted); font-weight: 600; backgro
   .search .input { width: 100%; }
   .search { flex: 1; }
 }
+
+/* inline editing + column filters + row delete */
+.sheet thead tr.filters th { background: #fff; position: sticky; top: 57px; z-index: 3; padding: 4px 5px; }
+.sheet thead tr.names th { height: 34px; }
+.sheet thead tr.letters th { height: 23px; }
+.col-filter { width: 100%; min-height: 26px; font-size: 12px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 5px; background: #fff; font-weight: 400; color: var(--ink); }
+.col-filter.on, select.col-filter:not([value='']) { border-color: var(--accent); }
+.col-filter:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.sheet td.editable { padding: 0; }
+.cell-edit { display: block; width: 100%; min-height: 40px; padding: 6px 8px; border: none; background: none; text-align: left; font: inherit; color: inherit; cursor: text; }
+.cell-edit:hover { background: var(--accent-soft); }
+.cell-empty { color: transparent; font-weight: 600; }
+.cell-edit:hover .cell-empty, .cell-edit:focus .cell-empty { color: var(--accent); }
+.cell-input { width: 100%; min-height: 40px; border: 2px solid var(--accent); border-radius: 0; padding: 5px 7px; font: inherit; background: #fff; resize: vertical; display: block; }
+.sheet .rn { position: sticky; }
+.row-del { display: none; margin: 4px auto 0; width: 24px; height: 24px; border: none; background: none; color: var(--danger); cursor: pointer; padding: 0; align-items: center; justify-content: center; border-radius: 5px; }
+.row-del:hover { background: var(--danger-soft); }
+.row-del svg { width: 14px; height: 14px; }
+.sheet tbody tr:hover .row-del, .row-del:focus { display: flex; }
+table.activity td { vertical-align: top; }

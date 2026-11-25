@@ -1,5 +1,5 @@
 'use client';
-import { Camera, Download, ExternalLink, Pencil, Folder, Image as ImageIcon, Loader2, RotateCcw, Trash2, Upload, Video, X } from 'lucide-react';
+import { Camera, Download, ExternalLink, History, Pencil, Folder, Image as ImageIcon, Loader2, RotateCcw, Trash2, Upload, Video, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeLogEntry, MediaSummary, Person, Row } from '@/lib/types';
 import { NamePicker } from './NamePicker';
@@ -41,6 +41,7 @@ export default function RowPanel({
   maxMb,
   rootFolderName,
   google,
+  onDeleteRow,
 }: {
   row: Row;
   people: Person[];
@@ -58,6 +59,7 @@ export default function RowPanel({
   maxMb: number;
   rootFolderName: string;
   google: boolean;
+  onDeleteRow?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -150,9 +152,19 @@ export default function RowPanel({
                 Edit this row in Google Sheets <ExternalLink className="icon" style={{ width: 13, height: 13, verticalAlign: -2 }} />
               </a>
             ) : canEdit ? (
-              <button type="button" className="btn small" onClick={() => setEditing(true)}>
-                <Pencil className="icon" /> Edit details
-              </button>
+              <span className="btn-row">
+                <button type="button" className="btn small" onClick={() => setEditing(true)}>
+                  <Pencil className="icon" /> Edit details
+                </button>
+                <a className="btn small ghost" href={`/activity?row=${row.rowNumber}`}>
+                  <History className="icon" /> Activity
+                </a>
+                {onDeleteRow && (
+                  <button type="button" className="btn small danger" onClick={onDeleteRow}>
+                    <Trash2 className="icon" /> Delete row
+                  </button>
+                )}
+              </span>
             ) : null}
           </p>
           {editing && <EditDetailsDialog row={row} onClose={() => setEditing(false)} onSave={(c) => { setEditing(false); onEdit(row, c); }} />}

@@ -75,6 +75,8 @@ export interface Row {
   stalled: boolean;
   stalledDays: number;
   duplicate: boolean;
+  /** Last change per column (field name → who and when), from the Change log. */
+  edits: Record<string, { by: string; at: string }>;
 }
 
 export interface Stats {

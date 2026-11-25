@@ -17,6 +17,7 @@ export interface SheetBackend {
   listTabs(): Promise<TabInfo[]>;
   addTab(title: string): Promise<number>;
   replaceGrid?(title: string, grid: string[][]): Promise<void>;
+  deleteRow?(title: string, rowNumber: number): Promise<void>;
 }
 
 /** 'Tab name'!A1:K */
@@ -185,6 +186,11 @@ export class MemorySheets implements SheetBackend {
   async replaceGrid(title: string, grid: string[][]) {
     this.tab(title).grid = grid.map((r) => [...r]);
   }
+  /** Remove one row (1-based); rows below move up, as in a spreadsheet. */
+  async deleteRow(title: string, rowNumber: number) {
+    const g = this.tab(title).grid;
+    if (rowNumber >= 2 && rowNumber <= g.length) g.splice(rowNumber - 1, 1);
+  }
 }
 
 /** Standalone storage: the same tabs as MemorySheets, persisted in SQLite (/data/app.db). */
@@ -219,6 +225,10 @@ export class SqliteSheets extends MemorySheets {
   }
   async replaceGrid(title: string, grid: string[][]) {
     await super.replaceGrid(title, grid);
+    this.save(title);
+  }
+  async deleteRow(title: string, rowNumber: number) {
+    await super.deleteRow(title, rowNumber);
     this.save(title);
   }
 }

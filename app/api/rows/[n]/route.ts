@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { actorOf, json, parseBody, withUser } from '@/lib/api';
-import { HttpError, snapshot, updateRow } from '@/lib/sheet-store';
+import { HttpError, deleteRow, snapshot, updateRow } from '@/lib/sheet-store';
+import { purgeMedia } from '@/lib/media-jobs';
 
 export const runtime = 'nodejs';
 
@@ -29,5 +30,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ n: string }> 
     const snap = await snapshot();
     const row = snap.rows.find((x) => x.rowNumber === r.rowNumber);
     return json({ row, movedFrom: r.movedFrom, changed: r.changed });
+  });
+}
+
+export async function DELETE(req: Request, ctx: { params: Promise<{ n: string }> }) {
+  return withUser(req, 'editor', async (u) => {
+    const n = Number((await ctx.params).n);
+    if (!Number.isInteger(n) || n < 2) throw new HttpError(400, 'Bad row number.');
+    const b = await parseBody(req, z.object({ rowKey: z.string().min(1) }));
+    const r = await deleteRow(n, b.rowKey, actorOf(u));
+    await purgeMedia(r.media);
+    return json({ deleted: r.rowNumber, title: r.title, mediaRemoved: r.media.length });
   });
 }

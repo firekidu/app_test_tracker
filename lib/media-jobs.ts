@@ -178,7 +178,7 @@ async function processUpload(id: string) {
         `UPDATE media SET width = ?, height = ?, duration_s = ?, thumb_file_id = ?, display_file_id = ?, preview_file_id = ?, status = 'ready' WHERE file_id = ?`,
       )
       .run(d.width ?? null, d.height ?? null, d.duration ?? null, d.thumb ?? null, d.display ?? null, d.preview ?? null, original.id);
-    await logMediaChange(u.row_key, 'Media added', '', u.file_name, { name: uploaderName }, note);
+    await logMediaChange(u.row_key, 'Media added', '', u.file_name, { name: u.uploader_username && u.uploader_username !== uploaderName ? `${uploaderName} (${u.uploader_username})` : uploaderName }, note);
     await fsp.rm(src, { force: true });
     setUploadStatus(id, 'done', { media_file_id: original.id, error: null });
     touchMedia();
@@ -266,6 +266,18 @@ export async function viewStream(m: MediaRecord, range: string | null): Promise<
   const s = await drive().stream(m.file_id, range);
   s.headers['content-type'] = m.mime_type;
   return s;
+}
+
+/** Remove files without logging (used when the whole row is deleted). */
+export async function purgeMedia(fileIds: string[]) {
+  for (const fid of fileIds) {
+    const m = getMedia(fid);
+    if (!m) continue;
+    for (const id of [m.file_id, m.thumb_file_id, m.display_file_id, m.preview_file_id]) if (id) await drive().trash(id).catch(() => undefined);
+    for (const role of ['thumb', 'display', 'preview'] as const) await fsp.rm(cachePath(m.file_id, role), { force: true });
+    db().prepare('DELETE FROM media WHERE file_id = ?').run(m.file_id);
+  }
+  if (fileIds.length) touchMedia();
 }
 
 export async function deleteMedia(m: MediaRecord, actorName: string) {
