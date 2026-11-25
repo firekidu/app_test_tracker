@@ -397,3 +397,6 @@ table.activity td { vertical-align: top; }
 .hf-pop .col-filter { min-height: 32px; font-size: 13px; }
 .clear-filters { width: 24px; height: 24px; border: none; border-radius: 5px; background: var(--accent); color: #fff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
 .clear-filters svg { width: 13px; height: 13px; }
+
+.dialog { position: relative; }
+.dialog-x { position: absolute; top: 12px; right: 12px; }

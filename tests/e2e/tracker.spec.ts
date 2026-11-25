@@ -280,3 +280,21 @@ test('Add row: title, calendar dates and a screenshot', async ({ page }) => {
   await expect(page.locator('.panel .meta')).toContainText('End date: 30/11/2026');
   await expect(page.locator('.panel .mcard')).toHaveCount(1, { timeout: 30_000 });
 });
+
+test('reset password popup stays open until Close; own account cannot be reset', async ({ page }) => {
+  await signIn(page, ADMIN, NEWPW);
+  await page.goto('/admin');
+  const mine = page.locator('tr', { has: page.locator('td.mono', { hasText: /^david$/ }) });
+  await expect(mine.locator('button:has-text("Reset password")')).toBeDisabled();
+  const other = page.locator('tr', { has: page.locator('td.mono', { hasText: /^renjith\.r$/ }) });
+  await other.locator('button:has-text("Reset password")').click();
+  await page.click('.dialog button:has-text("Reset password")');
+  await expect(page.locator('.secret-box code')).toHaveText(/^.{20}$/);
+  await page.waitForTimeout(4000); // used to vanish after ~2 s
+  await page.mouse.click(5, 5); // clicking outside does not close it
+  await page.keyboard.press('Escape'); // nor does Esc
+  await expect(page.locator('.secret-box code')).toBeVisible();
+  await expect(page).toHaveURL(/\/admin/);
+  await page.click('.dialog button:has-text("Close")');
+  await expect(page.locator('.secret-box')).toHaveCount(0);
+});

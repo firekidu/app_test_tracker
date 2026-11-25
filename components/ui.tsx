@@ -167,7 +167,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 export const useToast = () => useContext(ToastCtx);
 
 // ---------- dialog ----------
-export function Dialog({ title, onClose, children, labelledBy }: { title: string; onClose: () => void; children: ReactNode; labelledBy?: string }) {
+export function Dialog({ title, onClose, children, labelledBy, dismissible = true }: { title: string; onClose: () => void; children: ReactNode; labelledBy?: string; dismissible?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const tid = useId();
   useEffect(() => {
@@ -180,12 +180,12 @@ export function Dialog({ title, onClose, children, labelledBy }: { title: string
     <div
       className="dialog-wrap"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (dismissible && e.target === e.currentTarget) onClose();
       }}
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           e.stopPropagation();
-          onClose();
+          if (dismissible) onClose();
         }
         if (e.key === 'Tab') trapTab(e, ref.current);
       }}

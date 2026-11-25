@@ -1,5 +1,5 @@
 'use client';
-import { ArrowLeft, CheckCircle2, Copy, RefreshCw, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Copy, RefreshCw, X, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import type { Person } from '@/lib/types';
@@ -56,9 +56,13 @@ export default function AdminApp({ me }: { me: { username: string; displayName: 
 function SecretOnce({ title, username, password, onClose }: { title: string; username: string; password: string; onClose: () => void }) {
   const toast = useToast();
   return (
-    <Dialog title={title} onClose={onClose}>
+    <Dialog title={title} onClose={onClose} dismissible={false}>
+      <button type="button" className="icon-btn plain dialog-x" onClick={onClose} aria-label="Close">
+        <X className="icon" />
+      </button>
       <p>
-        Temporary password for <strong>{username}</strong>. It is shown <strong>once</strong>. Send the username and the password separately (for example the username by email and the password by phone). They will choose their own password when they first sign in.
+        Temporary password for <strong>{username}</strong>. It is shown <strong>once</strong> – copy it before closing this window.
+        This window stays open until you press Close. Send the username and the password separately (for example the username by email and the password by phone). They will choose their own password when they first sign in.
       </p>
       <div className="secret-box">
         <code>{password}</code>
@@ -74,7 +78,7 @@ function SecretOnce({ title, username, password, onClose }: { title: string; use
       </div>
       <div className="row-btns">
         <button type="button" className="btn primary" onClick={onClose}>
-          Done
+          I have copied it – Close
         </button>
       </div>
     </Dialog>
@@ -314,6 +318,8 @@ function Admin({ me }: { me: { username: string; displayName: string } }) {
                             <button
                               type="button"
                               className="btn small"
+                              disabled={u.username === me.username}
+                              title={u.username === me.username ? 'For your own account use Change password in the account menu' : undefined}
                               onClick={() =>
                                 setConfirm({
                                   title: 'Reset password',

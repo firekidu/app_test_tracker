@@ -11,12 +11,14 @@ const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
 
 const username = String(process.argv[2] ?? '').trim().toLowerCase();
-if (!username) {
-  console.error('Usage: node scripts/reset-admin.mjs <username>');
-  process.exit(2);
-}
 const dbPath = path.join(process.env.DATA_DIR || '/data', 'app.db');
 const db = new Database(dbPath);
+if (!username) {
+  console.log('Usage: node scripts/reset-admin.mjs <username>\n\nAccounts:');
+  for (const u of db.prepare('SELECT username, role, banned FROM "user" ORDER BY role, username').all())
+    console.log(`  ${u.username}  (${u.role}${u.banned ? ', disabled' : ''})`);
+  process.exit(2);
+}
 
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_';
 let pw = '';

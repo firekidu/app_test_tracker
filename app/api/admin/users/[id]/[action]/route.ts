@@ -19,6 +19,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string; ac
     } catch {}
     switch (action) {
       case 'reset-password': {
+        if (id === admin.id) return jsonError(409, 'Use Change password (account menu) for your own account.');
         const temporaryPassword = randomPassword(20);
         await setPassword(id, temporaryPassword, true);
         await revokeAllSessions(id);
