@@ -5,7 +5,8 @@ export const config = { matcher: ['/((?!api|_next/static|_next/image|favicon.ico
 
 export function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
-  const hasSession = req.cookies.getAll().some((c) => /(^|\.)better-auth\.session_token$/.test(c.name));
+  // Over HTTPS Better Auth prefixes the name with "__Secure-".
+  const hasSession = req.cookies.getAll().some((c) => /^(__Secure-)?better-auth\.session_token$/.test(c.name));
   if (pathname === '/login') return NextResponse.next();
   if (!hasSession) {
     const url = req.nextUrl.clone();
