@@ -26,8 +26,25 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the production image
+        run: docker build -t smprd-tracker:ci .
+      - name: Start it and check /api/health
+        run: |
+          docker run -d --name smprd-ci -p 3000:3000 -e APP_URL=http://localhost:3000 -e BETTER_AUTH_SECRET=ci-only-secret-ci-only-secret-123 \
+            -e INITIAL_ADMIN_PASSWORD=ci-only-temporary-password smprd-tracker:ci
+          for i in $(seq 1 30); do curl -fsS http://localhost:3000/api/health && exit 0; sleep 2; done
+          docker logs smprd-ci; exit 1
+      - name: ffmpeg and native modules are present
+        run: |
+          docker exec smprd-ci ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libx264
+          docker exec smprd-ci node -e "require('better-sqlite3'); require('sharp'); console.log('native modules ok')"
+
   deploy:
-    needs: test
+    needs: [test, docker]
     runs-on: ubuntu-latest
     env:
       # Non-secret defaults; override with repository variables or secrets of the same name.
