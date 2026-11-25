@@ -61,7 +61,13 @@ jobs:
     steps:
       - name: Check that the server sign-in secret exists
         id: gate
+        env:
+          SECRETS_JSON: ${{ toJSON(secrets) }}
+          VARS_JSON: ${{ toJSON(vars) }}
         run: |
+          # Names only (values are never printed) – helps spot a secret saved under the wrong name or place.
+          echo "Repository secrets visible to this workflow: $(jq -r 'keys - ["github_token"] | join(", ")' <<<"$SECRETS_JSON")"
+          echo "Repository variables visible to this workflow: $(jq -r 'keys | join(", ")' <<<"$VARS_JSON")"
           if [ "$HAS_PASSWORD" != "true" ] && [ "$HAS_KEY" != "true" ]; then
             echo "::error title=NOT DEPLOYED::The site was not deployed. Add the repository secret VPS_PASSWORD (or VPS_SSH_KEY) in Settings → Secrets and variables → Actions, then re-run this workflow."
             exit 1
