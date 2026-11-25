@@ -28,7 +28,22 @@ Sign in as `admin` (or `INITIAL_ADMIN_USERNAME`) with that password; you'll be a
 
 Checks: `npm run lint && npm test` (Vitest unit tests for mapping, stats, row identity, password policy, lock-out, names, upload maths) and `npm run build && npm run test:e2e` (Playwright, BUILD.md §15.3 in demo mode: forced password change, new editor, + Add name, Completed → End date, HEIC/HEVC uploads and seeking, wrong type rejected, delete, phone layout, lock-out). Both run in CI before every deploy.
 
-## Deploy (GitHub Actions → VPS)
+## Deploy with Coolify (production)
+
+The VPS runs Coolify, so Coolify builds and runs the app from this repository:
+
+1. Coolify → **Projects** → your project → **+ New** → **Public Repository** → `https://github.com/firekidu/app_test_tracker`, branch `claude/relaxed-einstein-1xpirl` (or `main` once merged).
+2. **Build Pack: Dockerfile**, **Ports Exposes: 3000**.
+3. **Domains:** `https://57-131-28-237.sslip.io` (or your own domain with an A record to the VPS).
+4. **Environment Variables:** `APP_URL` and `BETTER_AUTH_URL` = that https URL, `BETTER_AUTH_SECRET` = output of `openssl rand -base64 32`, `INITIAL_ADMIN_USERNAME=david`, `INITIAL_ADMIN_PASSWORD` = a temporary first password, `TZ=Europe/London`. (`DATA_SOURCE` defaults to `local`.)
+5. **Persistent Storage → Volume Mount:** name `smprd-data`, destination `/data`.
+6. **Health check:** path `/api/health`, port `3000`. Then **Deploy**.
+
+GitHub Actions still runs lint, unit tests, end-to-end tests and a Docker build on every push.
+
+## Alternative: deploy without Coolify (GitHub Actions → SSH → Compose + Caddy)
+
+Only for a VPS without Coolify (Caddy needs ports 80/443). Set the repository variable `DEPLOY_METHOD=ssh` to enable it.
 
 Every push to `main` (or the current working branch) runs lint, tests and a build, then deploys:
 
