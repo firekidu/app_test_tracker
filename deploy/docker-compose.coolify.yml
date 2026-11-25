@@ -1,0 +1,37 @@
+# Used by deploy/remote-deploy.sh when the VPS already runs Coolify: Coolify's Traefik proxy
+# owns ports 80/443, so the app joins the "coolify" network and is routed by labels
+# (HTTPS with Let's Encrypt via Coolify's "letsencrypt" resolver). No Caddy here.
+name: smprd
+
+services:
+  app:
+    build: ..
+    image: smprd-tracker:latest
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      DATA_DIR: /data
+    volumes:
+      - smprd-data:/data
+    networks:
+      - coolify
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - traefik.http.middlewares.smprd-redirect.redirectscheme.scheme=https
+      - traefik.http.routers.smprd-http.rule=Host(`${APP_DOMAIN}`)
+      - traefik.http.routers.smprd-http.entrypoints=http
+      - traefik.http.routers.smprd-http.middlewares=smprd-redirect
+      - traefik.http.routers.smprd-https.rule=Host(`${APP_DOMAIN}`)
+      - traefik.http.routers.smprd-https.entrypoints=https
+      - traefik.http.routers.smprd-https.tls=true
+      - traefik.http.routers.smprd-https.tls.certresolver=letsencrypt
+      - traefik.http.routers.smprd-https.priority=1000
+      - traefik.http.services.smprd.loadbalancer.server.port=3000
+
+volumes:
+  smprd-data:
+
+networks:
+  coolify:
+    external: true

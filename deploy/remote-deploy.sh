@@ -143,8 +143,16 @@ as_root mv "$BASE/src.new" "$BASE/src"
 as_root ln -sf "$ENVF" "$BASE/src/.env"
 
 cd "$BASE/src"
+# Coolify already owns ports 80/443 (Traefik): route through it instead of starting Caddy.
+if $DOCKER network inspect coolify >/dev/null 2>&1; then
+  log "Coolify detected: routing through Coolify's proxy (no Caddy)"
+  COMPOSE="$DOCKER compose -f deploy/docker-compose.coolify.yml --env-file $ENVF"
+  $DOCKER rm -f smprd-caddy-1 >/dev/null 2>&1 || true
+else
+  COMPOSE="$DOCKER compose --env-file $ENVF"
+fi
 log "Building and starting containers (first build takes a few minutes)"
-$DOCKER compose --env-file "$ENVF" up -d --build --remove-orphans
+$COMPOSE up -d --build --remove-orphans
 
 # ---------- 8. Wait for health ----------
 log "Waiting for the app to report healthy"
@@ -153,14 +161,18 @@ for i in $(seq 1 60); do
   if [ "$STATE" = healthy ]; then break; fi
   sleep 5
 done
-$DOCKER compose ps
+$COMPOSE ps
+echo "App container health: $STATE"
+echo "--- last app log lines ---"; $COMPOSE logs --tail 40 app || true
 if [ "$STATE" != healthy ]; then
-  echo "App did not become healthy. Recent logs:"; $DOCKER compose logs --tail 80 app; exit 1
+  echo "App did not become healthy."; exit 1
 fi
 $DOCKER exec smprd-app-1 node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>r.text()).then(t=>console.log('health:',t))"
 
-log "Recent proxy log (certificate status)"
-$DOCKER compose logs --tail 15 caddy | grep -iE "certificate|obtain|error" || true
+log "Proxy check from the server itself"
+curl -sk -o /dev/null -w "https://$APP_DOMAIN/api/health via local proxy → %{http_code}\n" --resolve "$APP_DOMAIN:443:127.0.0.1" "https://$APP_DOMAIN/api/health" || true
+log "Other containers claiming this domain (should be none):"
+$DOCKER ps --format '{{.Names}} {{.Labels}}' | grep -F "$APP_DOMAIN" | grep -v '^smprd-app-1 ' | cut -c1-200 || true
 
 # ---------- 9. Daily backup (03:17) → /opt/smprd/backups ----------
 as_root mkdir -p "$BASE/backups"

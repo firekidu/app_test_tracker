@@ -50,12 +50,12 @@ jobs:
           docker exec smprd-ci ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libx264
           docker exec smprd-ci node -e "require('better-sqlite3'); require('sharp'); console.log('native modules ok')"
 
-  # Production is deployed by Coolify on the VPS (see README → Deploy with Coolify).
-  # This SSH deploy (Docker Compose + Caddy) is only for servers WITHOUT Coolify; it runs
-  # only when the repository variable DEPLOY_METHOD is set to "ssh".
+  # Deploys over SSH with Docker Compose. On a VPS running Coolify the app is routed through
+  # Coolify's proxy (deploy/docker-compose.coolify.yml); otherwise Caddy provides HTTPS.
+  # Set the repository variable DEPLOY_METHOD=coolify-only to turn this job off.
   deploy:
     needs: [test, docker]
-    if: vars.DEPLOY_METHOD == 'ssh'
+    if: vars.DEPLOY_METHOD != 'coolify-only'
     runs-on: ubuntu-latest
     env:
       # Non-secret defaults; override with repository variables or secrets of the same name.
