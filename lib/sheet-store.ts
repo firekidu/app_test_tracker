@@ -813,8 +813,23 @@ export function standaloneSetup() {
         await importUnlocked(parseCsv(fs.readFileSync(c.SEED_CSV, 'utf8')), 'replace', 'setup');
         console.log(`[setup] Imported ${(s.raw ?? []).length} rows from ${c.SEED_CSV}`);
       }
+    } else if (c.SAMPLE_DATA && !c.demo && !(s.raw ?? []).length && !getSetting('sampleLoaded')) {
+      const { sampleGrid } = await import('./sample-data');
+      await importUnlocked(sampleGrid(c.TZ), 'replace', 'Sample data');
+      setSetting('sampleLoaded', new Date().toISOString());
+      console.log(`[setup] Loaded ${(s.raw ?? []).length} sample rows (set SAMPLE_DATA=false to skip).`);
+      sampleMediaPending = true;
     }
   });
+}
+
+let sampleMediaPending = false;
+/** After the sample rows exist, attach a few generated photos and a video through the normal upload pipeline. */
+export async function addSampleMediaIfPending() {
+  if (!sampleMediaPending) return;
+  sampleMediaPending = false;
+  const { queueSampleMedia } = await import('./sample-data');
+  await queueSampleMedia().catch((e) => console.warn('[setup] sample media skipped:', (e as Error).message));
 }
 
 const COL_ALIASES: Record<string, number> = {

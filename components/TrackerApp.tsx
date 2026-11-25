@@ -544,7 +544,7 @@ function ProgressCards({ data, status, setStatus }: { data: SheetPayload; status
         {ip.count > 0 && (
           <div className="card-foot" style={{ marginTop: 2 }}>
             {rowsText(ip.rows)}
-            {ip.blankOwnerRows.length > 0 && (ip.blankOwnerRows.length === ip.count ? ' · Bug Owner is blank' : ` · ${rowsText(ip.blankOwnerRows)} have no Bug Owner`)}
+            {ip.blankOwnerRows.length > 0 && (ip.blankOwnerRows.length === ip.count ? ' · Bug Owner is blank' : ` · ${rowsText(ip.blankOwnerRows)} ${ip.blankOwnerRows.length === 1 ? 'has' : 'have'} no Bug Owner`)}
           </div>
         )}
         {ip.count === 0 && <div className="card-foot">Nothing in progress.</div>}

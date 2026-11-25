@@ -1,7 +1,7 @@
 import { authReady } from './auth';
 import { config } from './config';
 import { db } from './db';
-import { standaloneSetup, startSyncLoop } from './sheet-store';
+import { addSampleMediaIfPending, standaloneSetup, startSyncLoop } from './sheet-store';
 import { cleanupUploads, startUploadHousekeeping } from './uploads';
 
 export async function boot() {
@@ -10,7 +10,10 @@ export async function boot() {
   await authReady();
   if (c.demo) console.log(`[boot] DEMO mode: in-memory sheet from ${c.DEMO_SHEET_CSV}, local-disk media store.`);
   else if (c.standalone) console.log('[boot] Standalone mode: rows in SQLite, media on the server disk (/data/media). Google is not used.');
-  if (c.standalone) await standaloneSetup();
+  if (c.standalone) {
+    await standaloneSetup();
+    void addSampleMediaIfPending();
+  }
   startSyncLoop();
   startUploadHousekeeping();
   void cleanupUploads().catch(() => undefined);

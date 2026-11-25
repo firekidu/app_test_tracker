@@ -43,6 +43,8 @@ const schema = z.object({
   DATA_SOURCE: z.enum(['local', 'google']).default('local'),
   /** Local mode: import this CSV (Sheet1 export) on first start when there are no rows yet. */
   SEED_CSV: z.string().default(''),
+  /** Local mode: load a small sample data set (rows + a few photos/videos) when the tracker is empty. */
+  SAMPLE_DATA: bool(true),
   /** Development / demo only: use an in-memory sheet seeded from this CSV and a local-disk "Drive". */
   DEMO_SHEET_CSV: z.string().default(''),
 });

@@ -708,6 +708,7 @@ function DataSection({ demo, act }: { demo: boolean; act: (label: string, fn: ()
   const [file, setFile] = useState<File | null>(null);
   const [mode, setMode] = useState<'replace' | 'append'>('append');
   const [confirm, setConfirm] = useState(false);
+  const [clearing, setClearing] = useState(false);
   async function run() {
     if (!file) return;
     await act('import', async () => {
@@ -730,7 +731,27 @@ function DataSection({ demo, act }: { demo: boolean; act: (label: string, fn: ()
           Export all rows (CSV)
         </a>
         <span className="muted" style={{ fontSize: 12.5 }}>Opens in Excel or Google Sheets.</span>
+        <button type="button" className="btn danger" onClick={() => setClearing(true)}>
+          Clear all rows
+        </button>
       </div>
+      {clearing && (
+        <ConfirmDialog
+          title="Clear all rows"
+          message="Remove every row (for example the SAMPLE rows) so you can start fresh or import your own sheet. Users and names are kept. Continue?"
+          confirmLabel="Clear all rows"
+          danger
+          onCancel={() => setClearing(false)}
+          onConfirm={async () => {
+            setClearing(false);
+            await act('clear', async () => {
+              const r = await fetch('/api/admin/import?mode=replace', { method: 'POST', headers: { 'Content-Type': 'text/csv' }, body: 'Bugs\n' });
+              const j = await r.json().catch(() => ({}));
+              if (!r.ok) throw new Error(j.message || 'Could not clear the rows.');
+            }, 'All rows cleared.');
+          }}
+        />
+      )}
       <h3 style={{ fontSize: 13, margin: '0 0 8px' }}>Import rows from CSV</h3>
       <p className="sub" style={{ margin: '0 0 10px' }}>
         In Google Sheets use File → Download → Comma-separated values. The first row must be the header (Bugs, Priority, Reported By, Status, Reported Date, End date, Milestone, Bug Owner, Deliverable, Notes). New names in Reported By / Bug Owner are added to People.
