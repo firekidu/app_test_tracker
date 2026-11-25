@@ -795,54 +795,39 @@ function SheetTable({
             </tr>
             <tr className="names">
               <th className="rn" scope="col">
-                1
-              </th>
-              {COLS.map((c) => (
-                <th key={c.letter} scope="col">
-                  {c.name}
-                  {c.isNew && <span className="new-badge">New</span>}
-                </th>
-              ))}
-            </tr>
-            <tr className="filters">
-              <th className="rn">
                 {anyFilter ? (
-                  <button type="button" className="icon-btn plain" style={{ width: 26, height: 26 }} onClick={() => setCf({})} aria-label="Clear column filters" title="Clear column filters">
+                  <button type="button" className="clear-filters" onClick={() => setCf({})} aria-label="Clear column filters" title="Clear all column filters">
                     <X className="icon" />
                   </button>
                 ) : (
-                  <Filter className="icon" aria-hidden style={{ color: 'var(--muted)', width: 13, height: 13 }} />
+                  '1'
                 )}
               </th>
               {COLS.map((c) => {
-                const set = (v: string) => setCf((f) => ({ ...f, [c.letter]: v }));
                 const v = cf[c.letter] ?? '';
-                const sel = (opts: { v: string; l: string }[]) => (
-                  <select className="col-filter" value={v} onChange={(e) => set(e.target.value)} aria-label={`Filter ${c.name}`}>
-                    <option value="">All</option>
-                    {opts.map((o) => (
-                      <option key={o.v} value={o.v}>
-                        {o.l}
-                      </option>
-                    ))}
-                  </select>
-                );
+                const set = (nv: string) => setCf((f) => ({ ...f, [c.letter]: nv }));
+                const options =
+                  c.letter === 'B'
+                    ? PRIORITIES.map((p) => ({ v: p, l: p }))
+                    : c.letter === 'D'
+                      ? statuses.map((x) => ({ v: x, l: statusLabel(x) }))
+                      : c.letter === 'C' || c.letter === 'H'
+                        ? [...(c.letter === 'H' ? [{ v: '-', l: 'No owner' }] : []), ...names.map((n) => ({ v: n, l: n }))]
+                        : c.letter === 'K'
+                          ? [
+                              { v: 'yes', l: 'Has media' },
+                              { v: 'no', l: 'No media' },
+                            ]
+                          : null;
                 return (
-                  <th key={c.letter}>
-                    {c.letter === 'B'
-                      ? sel(PRIORITIES.map((p) => ({ v: p, l: p })))
-                      : c.letter === 'D'
-                        ? sel(statuses.map((x) => ({ v: x, l: statusLabel(x) })))
-                        : c.letter === 'C' || c.letter === 'H'
-                          ? sel([...(c.letter === 'H' ? [{ v: '-', l: 'No owner' }] : []), ...names.map((n) => ({ v: n, l: n }))])
-                          : c.letter === 'K'
-                            ? sel([
-                                { v: 'yes', l: 'Has media' },
-                                { v: 'no', l: 'No media' },
-                              ])
-                            : (
-                              <input className={`col-filter${v ? ' on' : ''}`} value={v} onChange={(e) => set(e.target.value)} placeholder={c.letter === 'E' || c.letter === 'F' ? 'dd/mm/yyyy' : 'Filter…'} aria-label={`Filter ${c.name}`} />
-                            )}
+                  <th key={c.letter} scope="col" className={v ? 'filtered' : undefined}>
+                    <div className="th-inner">
+                      <span className="th-name">
+                        {c.name}
+                        {c.isNew && <span className="new-badge">New</span>}
+                      </span>
+                      <HeaderFilter name={c.name} value={v} onChange={set} options={options} placeholder={c.letter === 'E' || c.letter === 'F' ? 'dd/mm/yyyy' : 'Contains…'} />
+                    </div>
                   </th>
                 );
               })}
@@ -944,6 +929,65 @@ function filterByColumns(rows: Row[], cf: Record<string, string>): Row[] {
         default: return true;
       }
     }),
+  );
+}
+
+/** Filter button inside a column header (row 1), like a spreadsheet's AutoFilter. */
+function HeaderFilter({ name, value, onChange, options, placeholder }: { name: string; value: string; onChange: (v: string) => void; options: { v: string; l: string }[] | null; placeholder: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useClickOutside(ref, () => setOpen(false), open);
+  const label = options ? options.find((o) => o.v === value)?.l : value;
+  return (
+    <div className="hf" ref={ref}>
+      <button
+        type="button"
+        className={`hf-btn${value ? ' on' : ''}`}
+        aria-label={`Filter column ${name}`}
+        aria-expanded={open}
+        title={value ? `Filtered: ${label}` : `Filter ${name}`}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <Filter className="icon" />
+      </button>
+      {open && (
+        <div className="hf-pop" onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
+          {options ? (
+            <select
+              className="col-filter"
+              autoFocus
+              value={value}
+              aria-label={`Filter ${name}`}
+              onChange={(e) => {
+                onChange(e.target.value);
+                setOpen(false);
+              }}
+            >
+              <option value="">All</option>
+              {options.map((o) => (
+                <option key={o.v} value={o.v}>
+                  {o.l}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input className="col-filter" autoFocus value={value} placeholder={placeholder} aria-label={`Filter ${name}`} onChange={(e) => onChange(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && setOpen(false)} />
+          )}
+          {value && (
+            <button
+              type="button"
+              className="btn small ghost"
+              onClick={() => {
+                onChange('');
+                setOpen(false);
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

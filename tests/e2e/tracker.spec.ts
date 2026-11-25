@@ -207,14 +207,17 @@ test('inline edit: End date, Milestone, Deliverable, Notes from the table, with 
 
 test('column header filters', async ({ page }) => {
   await signIn(page, ADMIN, NEWPW);
+  await page.click('button[aria-label="Filter column Priority"]');
   await page.selectOption('select[aria-label="Filter Priority"]', 'High');
   const n = await page.locator('table.sheet tbody tr').count();
   expect(n).toBeGreaterThan(0);
   for (const t of await page.locator('table.sheet tbody tr td:nth-of-type(2)').allInnerTexts()) expect(t).toContain('High');
+  await page.click('button[aria-label="Filter column Milestone"]');
   await page.fill('input[aria-label="Filter Milestone"]', 'M9');
   await expect(page.locator('table.sheet tbody tr')).toHaveCount(0);
   await page.click('button[aria-label="Clear column filters"]');
   await expect(page.locator('table.sheet tbody tr')).toHaveCount(87);
+  await page.click('button[aria-label="Filter column Bug Owner"]');
   await page.selectOption('select[aria-label="Filter Bug Owner"]', '-');
   for (const t of await page.locator('table.sheet tbody tr td:nth-of-type(8)').allInnerTexts()) expect(t.trim()).toBe('');
 });

@@ -365,7 +365,6 @@ table.plain th { font-size: 12px; color: var(--muted); font-weight: 600; backgro
 }
 
 /* inline editing + column filters + row delete */
-.sheet thead tr.filters th { background: #fff; position: sticky; top: 57px; z-index: 3; padding: 4px 5px; }
 .sheet thead tr.names th { height: 34px; }
 .sheet thead tr.letters th { height: 23px; }
 .col-filter { width: 100%; min-height: 26px; font-size: 12px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 5px; background: #fff; font-weight: 400; color: var(--ink); }
@@ -383,3 +382,18 @@ table.plain th { font-size: 12px; color: var(--muted); font-weight: 600; backgro
 .row-del svg { width: 14px; height: 14px; }
 .sheet tbody tr:hover .row-del, .row-del:focus { display: flex; }
 table.activity td { vertical-align: top; }
+
+/* filters inside the column headers (row 1) */
+.sheet thead tr.names th { overflow: visible; }
+.th-inner { display: flex; align-items: center; gap: 4px; }
+.th-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hf { position: relative; flex: none; }
+.hf-btn { width: 22px; height: 22px; border: 1px solid transparent; border-radius: 5px; background: none; color: #9aa3b0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.hf-btn svg { width: 12px; height: 12px; }
+.hf-btn:hover { background: #fff; border-color: var(--line); color: var(--ink); }
+.hf-btn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.sheet thead tr.names th.filtered { background: var(--accent-soft); color: var(--accent); }
+.hf-pop { position: absolute; top: calc(100% + 6px); right: 0; z-index: 20; background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(16, 24, 40, 0.14); padding: 8px; width: 210px; display: flex; flex-direction: column; gap: 6px; font-weight: 400; }
+.hf-pop .col-filter { min-height: 32px; font-size: 13px; }
+.clear-filters { width: 24px; height: 24px; border: none; border-radius: 5px; background: var(--accent); color: #fff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.clear-filters svg { width: 13px; height: 13px; }
