@@ -1,0 +1,31 @@
+name: Live site check
+
+# Read-only check of the deployed site from the internet (GET requests only).
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/live-check.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      SITE: ${{ vars.APP_URL || 'https://57-131-28-237.sslip.io' }}
+    steps:
+      - name: HTTPS certificate
+        run: |
+          host=$(echo "$SITE" | sed -E 's#https?://##; s#/.*##')
+          echo | openssl s_client -connect "$host:443" -servername "$host" 2>/dev/null | openssl x509 -noout -subject -issuer -dates || true
+      - name: Health
+        run: |
+          curl -sS -m 20 -w '\nHTTP %{http_code}\n' "$SITE/api/health"
+      - name: Pages
+        run: |
+          for p in /login / /activity /api/sheet; do
+            curl -sS -m 20 -o /tmp/body -w "$p → %{http_code} %{redirect_url}\n" "$SITE$p"
+          done
+          grep -o 'SMPRD ERROR LOG' /dev/null || true
+          curl -sS -m 20 "$SITE/login" | grep -o '<title>[^<]*</title>' || true
