@@ -554,8 +554,8 @@ function PeopleSection({ sheet, unknownNames, act }: { sheet: SheetLite | null; 
   const people = sheet?.people ?? [];
   return (
     <section className="section" aria-labelledby="p-h">
-      <h2 id="p-h">People (names for Reported By and Bug Owner)</h2>
-      <p className="sub">The names offered in the Reported By and Bug Owner pickers. This is not the list of logins.</p>
+      <h2 id="p-h">People (names for Reported By and Change owner)</h2>
+      <p className="sub">The names offered in the Reported By and Change owner pickers. This is not the list of logins.</p>
       <div className="table-wrap">
         <table className="plain">
           <thead>
@@ -688,7 +688,7 @@ function MergeDialog({ p, people, onClose, act }: { p: Person; people: Person[];
           </select>
         </div>
         <label style={{ display: 'flex', gap: 8, fontSize: 13, marginBottom: 14 }}>
-          <input type="checkbox" checked={rows} onChange={(e) => setRows(e.target.checked)} /> Also update existing rows (rewrites those Reported By / Bug Owner cells and logs each one)
+          <input type="checkbox" checked={rows} onChange={(e) => setRows(e.target.checked)} /> Also update existing rows (rewrites those Reported By / Change owner cells and logs each one)
         </label>
         <div className="row-btns">
           <button type="button" className="btn" onClick={onClose}>
@@ -754,7 +754,7 @@ function DataSection({ demo, act }: { demo: boolean; act: (label: string, fn: ()
       )}
       <h3 style={{ fontSize: 13, margin: '0 0 8px' }}>Import rows from CSV</h3>
       <p className="sub" style={{ margin: '0 0 10px' }}>
-        In Google Sheets use File → Download → Comma-separated values. The first row must be the header (Bugs, Priority, Reported By, Status, Reported Date, End date, Milestone, Bug Owner, Deliverable, Notes). New names in Reported By / Bug Owner are added to People.
+        In Google Sheets use File → Download → Comma-separated values. The first row must be the header (Change Request, Priority, Reported By, Status, Reported Date, End date, Milestone, Change owner, Deliverable, Notes – the old names Bugs / Bug Owner also work). New names in Reported By / Change owner are added to People.
       </p>
       <div className="btn-row" style={{ alignItems: 'center' }}>
         <input type="file" accept=".csv,text/csv" aria-label="CSV file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />

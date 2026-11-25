@@ -1,6 +1,6 @@
-# SMPRD Tracker
+# EPM Dev Tracker
 
-A standalone web app for the **SMPRD ERROR LOG**. It keeps the sheet's column format (A–J, plus **K "Media"**), adds **progress cards**, lets the team edit every field (logged in a Change log), and attach, preview and play **photos and videos** on each row.
+A standalone web app (**EPM DEV TRACKER**) for change requests, based on the SMPRD error-log sheet. It keeps the sheet's column format (A–J, plus **K "Media"**), adds **progress cards**, lets the team edit every field (logged in a Change log), and attach, preview and play **photos and videos** on each row.
 
 **Storage (default, `DATA_SOURCE=local`)**: rows, names, change log and accounts live in SQLite on the server (`/data/app.db`); photos and videos on the server disk (`/data/media`). Google is not used. Import your existing sheet once via **Admin → Data → Import CSV**; export any time with **Export CSV**. (The original Google Sheets/Drive mode is still available with `DATA_SOURCE=google`.)
 

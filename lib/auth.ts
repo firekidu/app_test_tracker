@@ -20,7 +20,7 @@ const roles = {
 function createAuth() {
   const c = config();
   return betterAuth({
-    appName: 'SMPRD Tracker',
+    appName: 'EPM Dev Tracker',
     baseURL: c.BETTER_AUTH_URL,
     secret: c.BETTER_AUTH_SECRET || 'dev-only-secret-change-me-dev-only-secret',
     database: db(),

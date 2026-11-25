@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeLogEntry, MediaSummary, Person, Row } from '@/lib/types';
 import { NamePicker } from './NamePicker';
 import type { Uploads } from './useUploads';
-import { ChipSelect, Dialog, PRIORITIES, PriorityChip, STATUS_EDIT_ORDER, StatusChip, api, fmtBytes, fmtDuration, prettyDate, trapTab } from './ui';
+import { ChipSelect, Dialog, isoFromUk, ukDate, PRIORITIES, PriorityChip, STATUS_EDIT_ORDER, StatusChip, api, fmtBytes, fmtDuration, prettyDate, trapTab } from './ui';
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,video/mp4,video/quicktime,.mov';
 
@@ -138,8 +138,8 @@ export default function RowPanel({
               <NamePicker label="Reported By" value={row.reporter} raw={row.reporterRaw} known={row.reporterKnown} people={people} meName={meName} disabled={!canEdit} busy={busy[`${row.rowNumber}:reporter`]} onChoose={(n) => onEdit(row, { reporter: n })} /> on {row.reportedDate || '—'}
             </span>
             <span>
-              Bug Owner:{' '}
-              <NamePicker label="Bug Owner" value={row.owner} raw={row.ownerRaw} known={row.ownerKnown} people={people} meName={meName} allowNone emptyText="No owner" disabled={!canEdit} busy={busy[`${row.rowNumber}:owner`]} onChoose={(n) => onEdit(row, { owner: n })} />
+              Change owner:{' '}
+              <NamePicker label="Change owner" value={row.owner} raw={row.ownerRaw} known={row.ownerKnown} people={people} meName={meName} allowNone emptyText="No owner" disabled={!canEdit} busy={busy[`${row.rowNumber}:owner`]} onChoose={(n) => onEdit(row, { owner: n })} />
             </span>
             {row.endDate && <span>End date: {row.endDate}</span>}
             {row.milestone && <span>Milestone: {row.milestone}</span>}
@@ -331,17 +331,17 @@ function EditDetailsDialog({ row, onClose, onSave }: { row: Row; onClose: () => 
         }}
       >
         <div className="field">
-          <label htmlFor="ed-title">Bugs</label>
+          <label htmlFor="ed-title">Change Request</label>
           <textarea id="ed-title" className="input" value={v.title} onChange={set('title')} required maxLength={5000} />
         </div>
         <div className="two">
           <div className="field">
             <label htmlFor="ed-rd">Reported Date</label>
-            <input id="ed-rd" className="input mono" value={v.reportedDate} onChange={set('reportedDate')} placeholder="dd/mm/yyyy" required />
+            <input id="ed-rd" className="input" type="date" value={isoFromUk(v.reportedDate)} onChange={(e) => setV({ ...v, reportedDate: ukDate(e.target.value) })} required />
           </div>
           <div className="field">
             <label htmlFor="ed-ed">End date</label>
-            <input id="ed-ed" className="input mono" value={v.endDate} onChange={set('endDate')} placeholder="dd/mm/yyyy" />
+            <input id="ed-ed" className="input" type="date" value={isoFromUk(v.endDate)} onChange={(e) => setV({ ...v, endDate: ukDate(e.target.value) })} />
           </div>
         </div>
         <div className="two">

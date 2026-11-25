@@ -12,14 +12,14 @@ export type Priority = (typeof PRIORITIES)[number];
 export type Role = 'admin' | 'editor' | 'viewer';
 
 export const HEADERS = [
-  'Bugs',
+  'Change Request',
   'Priority',
   'Reported By',
   'Status',
   'Reported Date',
   'End date',
   'Milestone',
-  'Bug Owner',
+  'Change owner',
   'Deliverable',
   'Notes',
   'Media',

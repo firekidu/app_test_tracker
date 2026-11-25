@@ -11,6 +11,8 @@ const Body = z.object({
   reporter: z.string().max(120).default(''),
   owner: z.string().max(120).default(''),
   notes: z.string().max(5000).default(''),
+  reportedDate: z.string().max(20).optional(),
+  endDate: z.string().max(20).optional(),
 });
 
 export async function POST(req: Request) {

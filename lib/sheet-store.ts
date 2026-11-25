@@ -493,13 +493,13 @@ export function updateRow(n: number, key: string, changes: RowChanges, actor: Ac
       set(3, 'D', 'Status', changes.status);
       if (changes.status === 'Completed' && c.AUTO_END_DATE && !v[5].trim()) set(5, 'F', 'End date', isoToUk(todayIso(c.TZ)));
     }
-    if (owner !== undefined) set(7, 'H', 'Bug Owner', owner);
+    if (owner !== undefined) set(7, 'H', 'Change owner', owner);
     const textEdit = ['title', 'reportedDate', 'endDate', 'milestone', 'deliverable', 'notes'].some((k) => (changes as Record<string, unknown>)[k] !== undefined);
     if (textEdit && !c.standalone) throw new HttpError(422, 'Edit this field in Google Sheets.');
     if (changes.title !== undefined) {
       const t = changes.title.trim();
-      if (!t) throw new HttpError(422, 'Describe the bug.');
-      set(0, 'A', 'Bugs', t.slice(0, 5000));
+      if (!t) throw new HttpError(422, 'Describe the change request.');
+      set(0, 'A', 'Change Request', t.slice(0, 5000));
     }
     if (changes.reportedDate !== undefined) {
       const d = normDate(changes.reportedDate, 'Reported Date');
@@ -542,13 +542,15 @@ export interface NewRow {
   reporter: string;
   owner: string;
   notes: string;
+  reportedDate?: string;
+  endDate?: string;
 }
 
 export function addRow(input: NewRow, actor: Actor) {
   return withLock(async () => {
     await ensureFreshUnlocked();
     const c = config();
-    if (!input.title.trim()) throw new HttpError(422, 'Describe the bug.');
+    if (!input.title.trim()) throw new HttpError(422, 'Describe the change request.');
     if (!(STATUSES as readonly string[]).includes(input.status)) throw new HttpError(422, 'Unknown status.');
     if (!(PRIORITIES as readonly string[]).includes(input.priority)) throw new HttpError(422, 'Unknown priority.');
     const selfName = actor.personName || actor.displayName;
@@ -556,7 +558,9 @@ export function addRow(input: NewRow, actor: Actor) {
     if (c.standalone && normalizeText(reporterIn) === normalizeText(selfName)) await ensurePersonUnlocked(selfName, actor.displayName);
     const reporter = requireActivePerson(reporterIn, false);
     const owner = requireActivePerson(input.owner, true);
-    const values = [input.title.trim(), input.priority, reporter, input.status, isoToUk(todayIso(c.TZ)), '', '', owner, '', input.notes.trim(), ''];
+    const reported = (input.reportedDate ?? '').trim() ? normDate(input.reportedDate!, 'Reported Date') : isoToUk(todayIso(c.TZ));
+    const ended = normDate(input.endDate ?? '', 'End date');
+    const values = [input.title.trim(), input.priority, reporter, input.status, reported, ended, '', owner, '', input.notes.trim(), ''];
     const n = (await sheets().append(rng(c.SHEET_TAB, 'A:K'), [values])) ?? ((S().raw ?? []).reduce((m, r) => Math.max(m, r.rowNumber), 1) + 1);
     applyLocal(n, values);
     const key = rowKeyFromValues(values);
@@ -661,7 +665,7 @@ export function updatePerson(name: string, patch: PersonPatch, actor: Actor) {
         for (const r of s.raw ?? []) {
           const v = [...r.values];
           let changed = false;
-          for (const [col, letter, field] of [[2, 'C', 'Reported By'], [7, 'H', 'Bug Owner']] as const) {
+          for (const [col, letter, field] of [[2, 'C', 'Reported By'], [7, 'H', 'Change owner']] as const) {
             if (idx.has(normalizeText(v[col]))) {
               ups.push({ range: rng(c.SHEET_TAB, `${letter}${r.rowNumber}`), values: [[target.name]] });
               lines.push(logLine(r.rowNumber, rowKeyFromValues(v), v[0], field, v[col], target.name, by, 'Merged names'));
@@ -856,8 +860,8 @@ export async function addSampleMediaIfPending() {
 }
 
 const COL_ALIASES: Record<string, number> = {
-  bugs: 0, bug: 0, title: 0, priority: 1, 'reported by': 2, reporter: 2, status: 3, 'reported date': 4, date: 4,
-  'end date': 5, milestone: 6, 'bug owner': 7, owner: 7, deliverable: 8, notes: 9,
+  'change request': 0, 'change requests': 0, cr: 0, bugs: 0, bug: 0, title: 0, priority: 1, 'reported by': 2, reporter: 2, status: 3, 'reported date': 4, date: 4,
+  'end date': 5, milestone: 6, 'change owner': 7, 'bug owner': 7, owner: 7, deliverable: 8, notes: 9,
 };
 
 /** Map an uploaded CSV (header row + data) to A–J values. */
@@ -866,7 +870,7 @@ export function csvToRows(grid: string[][]): string[][] {
   if (!rows.length) throw new HttpError(422, 'The file is empty.');
   const header = rows[0].map((h) => normalizeText(h));
   const map = header.map((h) => COL_ALIASES[h] ?? -1);
-  if (!map.includes(0)) throw new HttpError(422, 'The first row must be the header and include a "Bugs" column.');
+  if (!map.includes(0)) throw new HttpError(422, 'The first row must be the header and include a "Change Request" (or "Bugs") column.');
   const out: string[][] = [];
   for (const r of rows.slice(1)) {
     const v = Array(HEADERS.length).fill('') as string[];
@@ -917,7 +921,7 @@ export function importRows(grid: string[][], mode: 'replace' | 'append', actor: 
 export async function exportGrid(): Promise<string[][]> {
   const snap = await snapshot();
   return [
-    ['Bugs', 'Priority', 'Reported By', 'Status', 'Reported Date', 'End date', 'Milestone', 'Bug Owner', 'Deliverable', 'Notes', 'Photos & videos'],
+    ['Change Request', 'Priority', 'Reported By', 'Status', 'Reported Date', 'End date', 'Milestone', 'Change owner', 'Deliverable', 'Notes', 'Photos & videos'],
     ...snap.rows.map((r) => [r.title, r.priority, r.reporter, r.status, r.reportedDate, r.endDate, r.milestone, r.owner, r.deliverable, r.notes, String(r.media.length)]),
   ];
 }

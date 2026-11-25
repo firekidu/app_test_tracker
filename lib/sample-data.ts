@@ -37,7 +37,7 @@ const isoMinus = (iso: string, days: number) => {
 export function sampleGrid(tz: string): string[][] {
   const today = todayIso(tz);
   return [
-    ['Bugs', 'Priority', 'Reported By', 'Status', 'Reported Date', 'End date', 'Milestone', 'Bug Owner', 'Deliverable', 'Notes'],
+    ['Change Request', 'Priority', 'Reported By', 'Status', 'Reported Date', 'End date', 'Milestone', 'Change owner', 'Deliverable', 'Notes'],
     ...ROWS.map(([title, pri, rep, st, age, done, ms, own, del, notes]) => [
       title, pri, rep, st, isoToUk(isoMinus(today, age)), done !== null ? isoToUk(isoMinus(today, age - done)) : '', ms, own, del, notes,
     ]),

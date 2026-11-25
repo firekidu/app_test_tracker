@@ -42,6 +42,7 @@ export function useUploads(opts: { maxMb: number; onDone: () => void; toast: (t:
   optsRef.current = opts;
 
   const patch = useCallback((id: string, p: Partial<UploadItem>) => {
+    itemsRef.current = itemsRef.current.map((x) => (x.localId === id ? { ...x, ...p } : x));
     setItems((xs) => xs.map((x) => (x.localId === id ? { ...x, ...p } : x)));
   }, []);
 
@@ -166,6 +167,8 @@ export function useUploads(opts: { maxMb: number; onDone: () => void; toast: (t:
         internals.current.set(localId, { file: f, acked: new Set(), chunkSize: 4 * 1024 * 1024, total: 0, abort: new AbortController() });
         add.push(base);
       }
+      // Make the new items visible to the queue immediately (not only after the next render).
+      itemsRef.current = [...itemsRef.current, ...add];
       setItems((xs) => [...xs, ...add]);
       setTimeout(() => pumpRef.current(), 0);
     },

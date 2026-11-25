@@ -78,7 +78,7 @@ export function AddNameDialog({ initial, initialSpellings, onDone, onCancel }: {
   );
 }
 
-/** Searchable combobox for Reported By / Bug Owner with "+ Add name". */
+/** Searchable combobox for Reported By / Change owner with "+ Add name". */
 export function NamePicker({
   value,
   raw,

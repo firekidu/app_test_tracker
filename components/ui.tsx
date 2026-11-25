@@ -273,6 +273,11 @@ export function prettyDate(iso: string | null | undefined) {
   if (Number.isNaN(d.getTime())) return '';
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
+/** "03/12/2026" → "2026-12-03" (for <input type="date">); "" when not a full date. */
+export function isoFromUk(uk: string | null | undefined) {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec((uk ?? '').trim());
+  return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : '';
+}
 export function ukDate(iso: string | null | undefined) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? '');
   return m ? `${m[3]}/${m[2]}/${m[1]}` : '';

@@ -43,6 +43,7 @@ import {
   api,
   prettyDate,
   statusLabel,
+  isoFromUk,
   ukDate,
   useClickOutside,
   useToast,
@@ -178,7 +179,7 @@ function Tracker() {
       if (f.owner === '-' && x.ownerRaw.trim()) return false;
       if (f.owner && f.owner !== '-' && x.owner !== f.owner) return false;
       if (q) {
-        const hay = `${x.title}\n${x.notes}`.toLowerCase();
+        const hay = [x.title, x.notes, x.reporter, x.reporterRaw, x.owner, x.ownerRaw, x.status, x.priority, x.reportedDate, x.endDate, x.milestone, x.deliverable, ...x.media.map((m) => `${m.name} ${m.caption ?? ''}`)].join('\n').toLowerCase();
         if (!hay.includes(q) && String(x.rowNumber) !== q.replace(/^row\s*/, '')) return false;
       }
       return true;
@@ -381,12 +382,14 @@ function Tracker() {
         <AddRowDialog
           data={data}
           onClose={() => setAddOpen(false)}
-          onAdded={async (n) => {
+          onAdded={async (n, rowKey, files) => {
             setAddOpen(false);
-            toast(`Row ${n} added to Sheet1.`);
+            toast(`Row ${n} added${files.length ? ` – uploading ${files.length} file${files.length > 1 ? 's' : ''}` : ''}.`);
+            if (files.length) uploads.addFiles({ rowNumber: n, rowKey }, files);
             update({ status: '', owner: '', priority: '', q: '' });
             await refresh(true);
             setHighlight(n);
+            if (files.length) update({ row: n, media: null }, true);
           }}
         />
       )}
@@ -473,7 +476,7 @@ function Header({ data, sheetUrl, canEdit, onAdd }: { data: SheetPayload; sheetU
       <div className="brand">
         <AppIcon />
         <div style={{ minWidth: 0 }}>
-          <h1>SMPRD ERROR LOG</h1>
+          <h1>EPM DEV TRACKER</h1>
           <span className="desktop-only">
             <SyncLine data={data} />
           </span>
@@ -579,7 +582,7 @@ function ProgressCards({ data, status, setStatus }: { data: SheetPayload; status
         {ip.count > 0 && (
           <div className="card-foot" style={{ marginTop: 2 }}>
             {rowsText(ip.rows)}
-            {ip.blankOwnerRows.length > 0 && (ip.blankOwnerRows.length === ip.count ? ' · Bug Owner is blank' : ` · ${rowsText(ip.blankOwnerRows)} ${ip.blankOwnerRows.length === 1 ? 'has' : 'have'} no Bug Owner`)}
+            {ip.blankOwnerRows.length > 0 && (ip.blankOwnerRows.length === ip.count ? ' · Change owner is blank' : ` · ${rowsText(ip.blankOwnerRows)} ${ip.blankOwnerRows.length === 1 ? 'has' : 'have'} no Change owner`)}
           </div>
         )}
         {ip.count === 0 && <div className="card-foot">Nothing in progress.</div>}
@@ -671,12 +674,17 @@ function Toolbar({ data, f, status, update, peopleNames }: { data: SheetPayload;
       <label className="search">
         <Search className="icon" />
         <span className="sr-only">Search rows</span>
-        <input className="input" type="search" placeholder="Search rows" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input className="input" type="search" placeholder="Search any name or text" value={q} onChange={(e) => setQ(e.target.value)} list="search-suggest" />
+        <datalist id="search-suggest">
+          {[...new Set([...data.people.filter((p) => p.active).map((p) => p.name), ...data.rows.flatMap((r) => [r.reporter, r.owner]).filter(Boolean)])].sort().map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
       </label>
       <label>
-        <span className="sr-only">Bug Owner</span>
-        <select className="input" value={f.owner} onChange={(e) => update({ owner: e.target.value })} aria-label="Bug Owner">
-          <option value="">Bug Owner: Anyone</option>
+        <span className="sr-only">Change owner</span>
+        <select className="input" value={f.owner} onChange={(e) => update({ owner: e.target.value })} aria-label="Change owner">
+          <option value="">Change owner: Anyone</option>
           {peopleNames.map((n) => (
             <option key={n} value={n}>
               {n}
@@ -705,14 +713,14 @@ function Toolbar({ data, f, status, update, peopleNames }: { data: SheetPayload;
 
 // ---------------- table ----------------
 const COLS: { letter: string; name: string; w: number; isNew?: boolean }[] = [
-  { letter: 'A', name: 'Bugs', w: 256 },
+  { letter: 'A', name: 'Change Request', w: 256 },
   { letter: 'B', name: 'Priority', w: 92 },
   { letter: 'C', name: 'Reported By', w: 104 },
   { letter: 'D', name: 'Status', w: 186 },
   { letter: 'E', name: 'Reported Date', w: 98 },
   { letter: 'F', name: 'End date', w: 96 },
   { letter: 'G', name: 'Milestone', w: 86 },
-  { letter: 'H', name: 'Bug Owner', w: 100 },
+  { letter: 'H', name: 'Change owner', w: 112 },
   { letter: 'I', name: 'Deliverable', w: 90 },
   { letter: 'J', name: 'Notes', w: 150 },
   { letter: 'K', name: 'Media', w: 178, isNew: true },
@@ -767,8 +775,9 @@ function SheetTable({
   const anyFilter = Object.values(cf).some(Boolean);
   const names = useMemo(() => [...new Set(allRows.flatMap((r) => [r.reporter, r.owner]).filter(Boolean))].sort(), [allRows]);
   const statuses = useMemo(() => [...new Set(allRows.map((r) => r.status).filter(Boolean))].sort(), [allRows]);
+  const OLD: Record<string, string> = { 'Change Request': 'Bugs', 'Change owner': 'Bug Owner' };
   const tip = (r: Row, field: string) => {
-    const e = r.edits?.[field];
+    const e = r.edits?.[field] ?? (OLD[field] ? r.edits?.[OLD[field]] : undefined);
     return e ? `Last edited by ${e.by} · ${e.at}` : undefined;
   };
   const nums = rows.map((r) => r.rowNumber);
@@ -785,14 +794,6 @@ function SheetTable({
             ))}
           </colgroup>
           <thead>
-            <tr className="letters">
-              <th className="rn" aria-hidden />
-              {COLS.map((c) => (
-                <th key={c.letter} aria-hidden>
-                  {c.letter}
-                </th>
-              ))}
-            </tr>
             <tr className="names">
               <th className="rn" scope="col">
                 {anyFilter ? (
@@ -851,7 +852,7 @@ function SheetTable({
                     </div>
                   )}
                 </th>
-                <td title={tip(r, 'Bugs')}>
+                <td title={tip(r, 'Change Request')}>
                   <button type="button" className="cell-title clamp2" onClick={() => onOpen(r.rowNumber)} title={r.title}>
                     {r.title}
                   </button>
@@ -868,8 +869,8 @@ function SheetTable({
                 <EditableCell kind="date" value={r.reportedDate} label={`Row ${r.rowNumber} Reported Date`} disabled={!textEdit} busy={busy[`${r.rowNumber}:reportedDate`]} title={tip(r, 'Reported Date')} onSave={(v) => onEdit(r, { reportedDate: v })} />
                 <EditableCell kind="date" value={r.endDate} label={`Row ${r.rowNumber} End date`} disabled={!textEdit} busy={busy[`${r.rowNumber}:endDate`]} title={tip(r, 'End date')} onSave={(v) => onEdit(r, { endDate: v })} />
                 <EditableCell kind="text" value={r.milestone} label={`Row ${r.rowNumber} Milestone`} disabled={!textEdit} busy={busy[`${r.rowNumber}:milestone`]} title={tip(r, 'Milestone')} onSave={(v) => onEdit(r, { milestone: v })} />
-                <td title={tip(r, 'Bug Owner')}>
-                  <NamePicker label={`Row ${r.rowNumber} Bug Owner`} value={r.owner} raw={r.ownerRaw} known={r.ownerKnown} people={data.people} meName={data.me.name} allowNone disabled={!canEdit} busy={busy[`${r.rowNumber}:owner`]} onChoose={(n) => onEdit(r, { owner: n })} />
+                <td title={tip(r, 'Change owner')}>
+                  <NamePicker label={`Row ${r.rowNumber} Change owner`} value={r.owner} raw={r.ownerRaw} known={r.ownerKnown} people={data.people} meName={data.me.name} allowNone disabled={!canEdit} busy={busy[`${r.rowNumber}:owner`]} onChoose={(n) => onEdit(r, { owner: n })} />
                 </td>
                 <EditableCell kind="text" value={r.deliverable} label={`Row ${r.rowNumber} Deliverable`} disabled={!textEdit} busy={busy[`${r.rowNumber}:deliverable`]} title={tip(r, 'Deliverable')} onSave={(v) => onEdit(r, { deliverable: v })} />
                 <EditableCell kind="long" className="notes" value={r.notes} label={`Row ${r.rowNumber} Notes`} disabled={!textEdit} busy={busy[`${r.rowNumber}:notes`]} title={tip(r, 'Notes') ?? r.notes} onSave={(v) => onEdit(r, { notes: v })} />
@@ -900,7 +901,7 @@ function SheetTable({
       </div>
       <div className="table-foot">
         <span>
-          {rows.length ? `Showing rows ${a}–${b} of ${data.stats.total}${rows.length !== data.stats.total ? ` (${rows.length} match)` : ''}` : `0 of ${data.stats.total} rows`} · same columns and order as the SMPRD ERROR LOG sheet, plus Media in column K
+          {rows.length ? `Showing rows ${a}–${b} of ${data.stats.total}${rows.length !== data.stats.total ? ` (${rows.length} match)` : ''}` : `0 of ${data.stats.total} rows`} · same columns and order as the original sheet, plus Media
         </span>
         <span>{data.sync.mode === 'google' ? 'Edits here write back to Sheet1 · files are stored in Google Drive' : 'Saved in the tracker database · files are stored on the server'}</span>
       </div>
@@ -1028,12 +1029,13 @@ function EditableCell({ value, onSave, kind, label, disabled, busy, title, class
           <input
             className="cell-input"
             autoFocus
-            value={v}
+            type={kind === 'date' ? 'date' : 'text'}
+            value={kind === 'date' ? isoFromUk(v) : v}
             aria-label={label}
-            placeholder={kind === 'date' ? 'dd/mm/yyyy' : ''}
-            inputMode={kind === 'date' ? 'numeric' : undefined}
-            onFocus={(e) => e.target.select()}
-            onChange={(e) => setV(e.target.value)}
+            onFocus={(e) => {
+              if (kind !== 'date') e.target.select();
+            }}
+            onChange={(e) => setV(kind === 'date' ? ukDate(e.target.value) : e.target.value)}
             onBlur={() => done(true)}
             onKeyDown={(e) => {
               if (e.key === 'Escape') { setV(value); done(false); }
@@ -1159,7 +1161,12 @@ function PhoneView({
 }
 
 // ---------------- add row ----------------
-function AddRowDialog({ data, onClose, onAdded }: { data: SheetPayload; onClose: () => void; onAdded: (n: number) => void }) {
+function AddRowDialog({ data, onClose, onAdded }: { data: SheetPayload; onClose: () => void; onAdded: (n: number, rowKey: string, files: File[]) => void }) {
+  const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' }); // yyyy-mm-dd
+  const [reportedDate, setReportedDate] = useState(todayIso);
+  const [endDate, setEndDate] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const fileIn = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState('Medium');
   const [status, setStatus] = useState('TBD');
@@ -1173,8 +1180,8 @@ function AddRowDialog({ data, onClose, onAdded }: { data: SheetPayload; onClose:
     setBusy(true);
     setError('');
     try {
-      const r = await api<{ row: { rowNumber: number } }>('POST', '/api/rows', { title, priority, status, reporter: reporter || data.me.name, owner, notes });
-      onAdded(r.row.rowNumber);
+      const r = await api<{ row: { rowNumber: number; rowKey: string } }>('POST', '/api/rows', { title, priority, status, reporter: reporter || data.me.name, owner, notes, reportedDate: ukDate(reportedDate), endDate: ukDate(endDate) });
+      onAdded(r.row.rowNumber, r.row.rowKey, files);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -1182,7 +1189,7 @@ function AddRowDialog({ data, onClose, onAdded }: { data: SheetPayload; onClose:
     }
   }
   return (
-    <Dialog title="Add a row to Sheet1" onClose={onClose}>
+    <Dialog title="Add row" onClose={onClose}>
       <form onSubmit={submit}>
         {error && (
           <div className="form-error" role="alert">
@@ -1190,7 +1197,7 @@ function AddRowDialog({ data, onClose, onAdded }: { data: SheetPayload; onClose:
           </div>
         )}
         <div className="field">
-          <label htmlFor="ar-title">Bugs</label>
+          <label htmlFor="ar-title">Change Request</label>
           <textarea id="ar-title" className="input" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={5000} />
         </div>
         <div className="two">
@@ -1217,17 +1224,54 @@ function AddRowDialog({ data, onClose, onAdded }: { data: SheetPayload; onClose:
             <NamePicker label="Reported By" inline={false} value={reporter} raw={reporter} known people={data.people} meName={data.me.name} onChoose={setReporter} emptyText={data.me.name} />
           </div>
           <div className="field">
-            <span style={{ fontSize: 12.5, fontWeight: 600 }}>Bug Owner</span>
-            <NamePicker label="Bug Owner" inline={false} value={owner} raw={owner} known people={data.people} meName={data.me.name} allowNone noneLabel="Decide later" onChoose={setOwner} emptyText="Decide later" />
+            <span style={{ fontSize: 12.5, fontWeight: 600 }}>Change owner</span>
+            <NamePicker label="Change owner" inline={false} value={owner} raw={owner} known people={data.people} meName={data.me.name} allowNone noneLabel="Decide later" onChoose={setOwner} emptyText="Decide later" />
           </div>
         </div>
         <div className="field">
           <label htmlFor="ar-notes">Notes</label>
           <textarea id="ar-notes" className="input" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={5000} />
         </div>
-        <p className="muted" style={{ fontSize: 12 }}>
-          Reported Date is set to today ({ukDate(new Date().toISOString().slice(0, 10))}).
-        </p>
+        <div className="two">
+          <div className="field">
+            <label htmlFor="ar-rd">Reported Date</label>
+            <input id="ar-rd" className="input" type="date" value={reportedDate} onChange={(e) => setReportedDate(e.target.value)} required />
+          </div>
+          <div className="field">
+            <label htmlFor="ar-ed">End date</label>
+            <input id="ar-ed" className="input" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          </div>
+        </div>
+        <div className="field">
+          <span style={{ fontSize: 12.5, fontWeight: 600 }}>Screenshots, photos or videos</span>
+          <div className="btn-row" style={{ alignItems: 'center' }}>
+            <button type="button" className="btn small" onClick={() => fileIn.current?.click()}>
+              <Paperclip className="icon" /> Add screenshot
+            </button>
+            <span className="muted" style={{ fontSize: 12 }}>
+              {files.length ? `${files.length} file${files.length > 1 ? 's' : ''}: ${files.map((f) => f.name).join(', ')}` : 'JPG, PNG, HEIC, MP4 or MOV'}
+            </span>
+            {files.length > 0 && (
+              <button type="button" className="btn small ghost" onClick={() => setFiles([])}>
+                Remove
+              </button>
+            )}
+          </div>
+          <input
+            ref={fileIn}
+            type="file"
+            hidden
+            multiple
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,video/mp4,video/quicktime,.mov"
+            aria-label="Screenshots"
+            onChange={(e) => {
+              const picked = Array.from(e.target.files ?? []); // read before clearing the input
+              setFiles((f) => [...f, ...picked]);
+              e.target.value = '';
+            }}
+          />
+          <span className="hint">Uploaded to the new row as soon as it is saved.</span>
+        </div>
         <div className="row-btns">
           <button type="button" className="btn" onClick={onClose}>
             Cancel

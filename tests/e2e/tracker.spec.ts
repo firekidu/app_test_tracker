@@ -60,11 +60,11 @@ test('2 · admin creates an editor; temporary password shown once; editor must c
   await ctx.close();
 });
 
-test('3 · Bug Owner: add a new name from the picker', async ({ page }) => {
+test('3 · Change owner: add a new name from the picker', async ({ page }) => {
   await signIn(page, ADMIN, NEWPW);
   await page.waitForSelector('tr[data-row="87"]');
-  await page.click('tr[data-row="87"] button[aria-label^="Row 87 Bug Owner"]');
-  await page.fill('input[aria-label="Search Row 87 Bug Owner"]', 'Anita K');
+  await page.click('tr[data-row="87"] button[aria-label^="Row 87 Change owner"]');
+  await page.fill('input[aria-label="Search Row 87 Change owner"]', 'Anita K');
   await page.locator('.dd-pop .add-opt').click();
   await page.click('.dialog button:has-text("Add name")');
   await expect(page.locator('tr[data-row="87"] td').nth(7)).toContainText('Anita K');
@@ -146,11 +146,12 @@ test('edit details: text and dates are editable in the app and logged', async ({
   await expect(page.locator('.panel .notes-box')).toHaveText('Reproduced on build 210');
   await expect(page.locator('.panel .history')).toContainText('Notes');
   await expect(page.locator('tr[data-row="86"] td').nth(9)).toContainText('Reproduced on build 210');
-  // bad date is refused
+  // dates use calendar inputs
   await page.click('.panel button:has-text("Edit details")');
-  await page.fill('#ed-ed', '31/31/2026');
+  await expect(page.locator('#ed-ed')).toHaveAttribute('type', 'date');
+  await page.locator('#ed-ed').fill('2026-12-24');
   await page.click('.dialog button:has-text("Save")');
-  await expect(page.locator('.toast.err')).toContainText('dd/mm/yyyy');
+  await expect(page.locator('.panel .meta')).toContainText('End date: 24/12/2026');
 });
 
 test('export CSV and import (append) from Admin → Data', async ({ page }) => {
@@ -158,7 +159,7 @@ test('export CSV and import (append) from Admin → Data', async ({ page }) => {
   const res = await page.request.get('/api/export');
   expect(res.status()).toBe(200);
   const csv = await res.text();
-  expect(csv.split('\n')[0]).toContain('Bugs,Priority,Reported By,Status');
+  expect(csv.split('\n')[0]).toContain('Change Request,Priority,Reported By,Status');
   expect(csv.trim().split('\n').length).toBe(87);
   const file = path.join(tmp, 'more.csv');
   fs.writeFileSync(file, 'Bugs,Priority,Reported By,Status,Reported Date\nImported bug one,High,Priya S,TBD,20/11/2026\n');
@@ -182,7 +183,7 @@ test('inline edit: End date, Milestone, Deliverable, Notes from the table, with 
   await signIn(page, ADMIN, NEWPW);
   const row = page.locator('tr[data-row="20"]');
   await row.locator('button[aria-label^="Row 20 End date"]').click();
-  await page.keyboard.type('03/12/2026'); // existing text is selected, so typing replaces it
+  await page.locator('input[aria-label="Row 20 End date"]').fill('2026-12-03'); // calendar input
   await page.keyboard.press('Enter');
   await expect(page.locator('.toast').first()).toContainText('Row 20: End date → 03/12/2026');
   await row.locator('button[aria-label^="Row 20 Milestone"]').click();
@@ -217,8 +218,8 @@ test('column header filters', async ({ page }) => {
   await expect(page.locator('table.sheet tbody tr')).toHaveCount(0);
   await page.click('button[aria-label="Clear column filters"]');
   await expect(page.locator('table.sheet tbody tr')).toHaveCount(87);
-  await page.click('button[aria-label="Filter column Bug Owner"]');
-  await page.selectOption('select[aria-label="Filter Bug Owner"]', '-');
+  await page.click('button[aria-label="Filter column Change owner"]');
+  await page.selectOption('select[aria-label="Filter Change owner"]', '-');
   for (const t of await page.locator('table.sheet tbody tr td:nth-of-type(8)').allInnerTexts()) expect(t.trim()).toBe('');
 });
 
@@ -236,4 +237,46 @@ test('delete a row: confirmation, rows move up, logged in the Activity log', asy
   await expect(page.locator('table.activity tbody tr').first()).toContainText(title.slice(0, 30));
   await expect(page.locator('table.activity tbody tr').first().locator('td').nth(6)).toHaveText(/david/);
   await expect(page.locator('table.activity tbody tr').first().locator('td').first()).toHaveText(/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}/);
+});
+
+test('new name and labels; no column-letter row', async ({ page }) => {
+  await signIn(page, ADMIN, NEWPW);
+  await expect(page.locator('header h1')).toHaveText('EPM DEV TRACKER');
+  await expect(page).toHaveTitle('EPM DEV TRACKER');
+  await expect(page.locator('table.sheet thead tr')).toHaveCount(1);
+  await expect(page.locator('table.sheet thead')).toContainText('Change Request');
+  await expect(page.locator('table.sheet thead')).toContainText('Change owner');
+  await expect(page.locator('table.sheet thead')).not.toContainText('Bug Owner');
+});
+
+test('search finds a person in any column', async ({ page }) => {
+  await signIn(page, ADMIN, NEWPW);
+  const all = await page.locator('table.sheet tbody tr').count();
+  await page.fill('input[type=search]', 'gautham');
+  await expect.poll(() => page.locator('table.sheet tbody tr').count()).toBeLessThan(all);
+  const rows = await page.locator('table.sheet tbody tr').allInnerTexts();
+  expect(rows.length).toBeGreaterThan(5);
+  for (const t of rows) expect(t.toLowerCase()).toContain('gautham');
+});
+
+test('Add row: title, calendar dates and a screenshot', async ({ page }) => {
+  const shot = path.join(tmp, 'add-row-shot.jpg');
+  execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=duration=1:size=640x400:rate=1', '-frames:v', '1', shot]);
+  await signIn(page, ADMIN, NEWPW);
+  await page.click('header button:has-text("Add row")');
+  await expect(page.locator('.dialog h2')).toHaveText('Add row');
+  await expect(page.locator('.dialog')).toContainText('Change Request');
+  await expect(page.locator('.dialog')).toContainText('Change owner');
+  await page.fill('#ar-title', 'Add export button to the EPM dashboard');
+  await page.locator('#ar-rd').fill('2026-11-20');
+  await page.locator('#ar-ed').fill('2026-11-30');
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('.dialog button:has-text("Add screenshot")')]);
+  await chooser.setFiles(shot);
+  await expect(page.locator('.dialog')).toContainText('add-row-shot.jpg');
+  await page.click('.dialog button[type=submit]');
+  await expect(page.locator('.panel')).toBeVisible();
+  await expect(page.locator('.panel h2')).toHaveText('Add export button to the EPM dashboard');
+  await expect(page.locator('.panel .meta')).toContainText('20/11/2026');
+  await expect(page.locator('.panel .meta')).toContainText('End date: 30/11/2026');
+  await expect(page.locator('.panel .mcard')).toHaveCount(1, { timeout: 30_000 });
 });

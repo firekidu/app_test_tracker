@@ -39,7 +39,7 @@ export default function LoginForm() {
         <div className="auth-brand">
           <AppIcon />
           <div>
-            <h1>SMPRD ERROR LOG</h1>
+            <h1>EPM DEV TRACKER</h1>
             <p>Sign in to the tracker</p>
           </div>
         </div>
