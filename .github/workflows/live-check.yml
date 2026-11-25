@@ -19,13 +19,21 @@ jobs:
         run: |
           host=$(echo "$SITE" | sed -E 's#https?://##; s#/.*##')
           echo | openssl s_client -connect "$host:443" -servername "$host" 2>/dev/null | openssl x509 -noout -subject -issuer -dates || true
-      - name: Health
+      - name: Health (certificate checked)
+        continue-on-error: true
+        run: curl -sS -m 20 -w '\nHTTP %{http_code}\n' "$SITE/api/health"
+      - name: What the proxy answers (certificate not checked, HTTPS and HTTP)
         run: |
-          curl -sS -m 20 -w '\nHTTP %{http_code}\n' "$SITE/api/health"
+          http="http://${SITE#https://}"
+          for u in "$SITE/api/health" "$http/api/health" "$SITE/login" "$http/login"; do
+            echo "== $u"
+            curl -sS -k -m 20 -D - -o /tmp/body "$u" | grep -iE '^(HTTP|location|server|content-type)' || true
+            head -c 300 /tmp/body; echo
+          done
       - name: Pages
+        continue-on-error: true
         run: |
           for p in /login / /activity /api/sheet; do
-            curl -sS -m 20 -o /tmp/body -w "$p → %{http_code} %{redirect_url}\n" "$SITE$p"
+            curl -sS -k -m 20 -o /tmp/body -w "$p → %{http_code} %{redirect_url}\n" "$SITE$p"
           done
-          grep -o 'SMPRD ERROR LOG' /dev/null || true
-          curl -sS -m 20 "$SITE/login" | grep -o '<title>[^<]*</title>' || true
+          curl -sS -k -m 20 "$SITE/login" | grep -o '<title>[^<]*</title>' || true
