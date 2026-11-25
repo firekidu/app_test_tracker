@@ -43,8 +43,10 @@ jobs:
             -e INITIAL_ADMIN_PASSWORD=ci-only-temporary-password smprd-tracker:ci
           for i in $(seq 1 30); do curl -fsS http://localhost:3000/api/health && exit 0; sleep 2; done
           docker logs smprd-ci; exit 1
-      - name: ffmpeg and native modules are present
+      - name: ffmpeg, curl (Coolify health check) and native modules are present
         run: |
+          docker exec smprd-ci curl -fsS http://localhost:3000/api/health
+          docker exec smprd-ci wget -qO- http://127.0.0.1:3000/api/health
           docker exec smprd-ci ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libx264
           docker exec smprd-ci node -e "require('better-sqlite3'); require('sharp'); console.log('native modules ok')"
 
