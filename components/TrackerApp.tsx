@@ -46,6 +46,7 @@ import {
   isoFromUk,
   ukDate,
   useClickOutside,
+  useFloating,
   useToast,
 } from './ui';
 
@@ -944,12 +945,15 @@ function filterByColumns(rows: Row[], cf: Record<string, string>): Row[] {
 function HeaderFilter({ name, value, onChange, options, placeholder }: { name: string; value: string; onChange: (v: string) => void; options: { v: string; l: string }[] | null; placeholder: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const btn = useRef<HTMLButtonElement>(null);
   useClickOutside(ref, () => setOpen(false), open);
+  const pos = useFloating(open, btn, { align: 'right', width: 210 });
   const label = options ? options.find((o) => o.v === value)?.l : value;
   return (
     <div className="hf" ref={ref}>
       <button
         type="button"
+        ref={btn}
         className={`hf-btn${value ? ' on' : ''}`}
         aria-label={`Filter column ${name}`}
         aria-expanded={open}
@@ -959,7 +963,7 @@ function HeaderFilter({ name, value, onChange, options, placeholder }: { name: s
         <Filter className="icon" />
       </button>
       {open && (
-        <div className="hf-pop" onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
+        <div className="hf-pop" style={pos} onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
           {options ? (
             <select
               className="col-filter"

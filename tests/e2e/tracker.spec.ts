@@ -328,3 +328,39 @@ test('blank Change owner cell has a clickable "+ Add owner" button', async ({ pa
   await page.locator('.dd-pop [role=option]').nth(1).click();
   await expect(page.locator(`tr[data-row="${row}"] button[aria-label$="Change owner: none. Change"]`)).toHaveCount(0);
 });
+
+test('dropdowns are not cut off when only a few rows are shown', async ({ page }) => {
+  await signIn(page, ADMIN, NEWPW);
+  await page.click('.toolbar .fchip:has-text("In progress")');
+  await page.fill('input[type=search]', 'Share link');
+  await expect.poll(() => page.locator('table.sheet tbody tr').count()).toBeLessThanOrEqual(2);
+  const visible = async (sel: string) => {
+    const opts = page.locator(sel);
+    const n = await opts.count();
+    expect(n).toBeGreaterThan(2);
+    for (let i = 0; i < n; i++) {
+      // the option must be the element actually drawn at its own centre (not hidden behind the table edge)
+      const hit = await opts.nth(i).evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return !!top && el.contains(top);
+      });
+      expect(hit).toBe(true);
+    }
+  };
+  await page.locator('table.sheet tbody tr').first().locator('button[aria-label*=" status:"]').click();
+  await visible('.dd-pop[role=listbox] [role=option]');
+  await page.keyboard.press('Escape');
+  await page.locator('table.sheet tbody tr').first().locator('button[aria-label*="Change owner"]').click();
+  await visible('.dd-pop [role=option]');
+  await page.keyboard.press('Escape');
+  await page.click('button[aria-label="Filter column Status"]');
+  await expect(page.locator('.hf-pop')).toBeVisible();
+  const box = await page.locator('.hf-pop').boundingBox();
+  const hit = await page.locator('.hf-pop select').evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+  });
+  expect(box!.height).toBeGreaterThan(20);
+  expect(hit).toBe(true);
+});

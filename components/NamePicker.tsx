@@ -2,7 +2,7 @@
 import { Loader2, Plus } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { Person } from '@/lib/types';
-import { Dialog, api, useClickOutside } from './ui';
+import { Dialog, api, useClickOutside, useFloating } from './ui';
 
 const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
 
@@ -121,6 +121,7 @@ export function NamePicker({
   const lbId = useId();
   useClickOutside(ref, () => setOpen(false), open && !adding);
   const isPhone = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches;
+  const pos = useFloating(open && !isPhone, btn, { width: 220 });
 
   const options = useMemo(() => {
     const active = people.filter((p) => p.active).sort((a, b) => a.name.localeCompare(b.name));
@@ -187,7 +188,7 @@ export function NamePicker({
         {!known && raw && <span className="not-in-people">not in People</span>}
       </button>
       {open && (
-        <div className={`dd-pop${isPhone ? ' sheet-mobile' : ''}`} style={{ minWidth: 220 }}>
+        <div className={`dd-pop${isPhone ? ' sheet-mobile' : ''}`} style={{ minWidth: 220, ...pos }}>
           <input
             ref={input}
             className="input search-in"

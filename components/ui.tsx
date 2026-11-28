@@ -1,6 +1,6 @@
 'use client';
 import { ChevronDown, Eye, EyeOff, Loader2 } from 'lucide-react';
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 
 export const STATUS_STYLE: Record<string, { text: string; bg: string; bar: string }> = {
   Completed: { text: '#166B43', bg: '#DDF3E6', bar: '#2E9E63' },
@@ -60,6 +60,43 @@ export function useClickOutside(ref: React.RefObject<HTMLElement | null>, onOut:
   }, [ref, onOut, active]);
 }
 
+/**
+ * Places a dropdown with position: fixed next to its button, so the table's scroll box cannot clip it
+ * (e.g. when only one or two rows are shown). Opens upwards when there is more room above.
+ */
+export function useFloating(open: boolean, anchor: RefObject<HTMLElement | null>, opts: { align?: 'left' | 'right'; width?: number } = {}): CSSProperties | undefined {
+  const [style, setStyle] = useState<CSSProperties>();
+  const { align = 'left', width = 220 } = opts;
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const el = anchor.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const below = vh - r.bottom - 12;
+      const above = r.top - 12;
+      const up = below < 220 && above > below;
+      const s: CSSProperties = { position: 'fixed', zIndex: 60, maxHeight: Math.max(120, Math.min(320, up ? above : below)) };
+      // Set every side: the stylesheet's own top/left/right would otherwise still apply.
+      s.top = up ? 'auto' : r.bottom + 4;
+      s.bottom = up ? vh - r.top + 4 : 'auto';
+      s.left = align === 'right' ? 'auto' : Math.max(8, Math.min(r.left, vw - width - 8));
+      s.right = align === 'right' ? Math.max(8, vw - r.right) : 'auto';
+      setStyle(s);
+    };
+    place();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [open, anchor, align, width]);
+  return open ? style : undefined;
+}
+
 /** Small listbox dropdown used for Status and Priority. */
 export function ChipSelect({
   value,
@@ -84,6 +121,7 @@ export function ChipSelect({
   const btn = useRef<HTMLButtonElement>(null);
   const id = useId();
   useClickOutside(ref, () => setOpen(false), open);
+  const pos = useFloating(open, btn, { width: 180 });
   if (disabled) return <>{render(value, { caret: false, busy: !!busy })}</>;
   const choose = (v: string) => {
     setOpen(false);
@@ -121,7 +159,7 @@ export function ChipSelect({
         {render(value, { caret: true, busy: !!busy })}
       </button>
       {open && (
-        <div className="dd-pop" role="listbox" id={id} aria-label={label}>
+        <div className="dd-pop" style={pos} role="listbox" id={id} aria-label={label}>
           {options.map((o, i) => (
             <div
               key={o}
