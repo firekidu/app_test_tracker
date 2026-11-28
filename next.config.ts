@@ -15,7 +15,22 @@ const csp = [
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  serverExternalPackages: ['better-sqlite3', 'sharp', 'heic-convert'],
+  serverExternalPackages: ['better-sqlite3', 'sharp', 'heic-convert', 'file-type'],
+  // file-type (upload type check) and its dependencies are ESM packages whose entry files the
+  // tracer misses; without them every upload fails at "complete" in the Docker image.
+  outputFileTracingIncludes: {
+    '/api/**': [
+      './node_modules/file-type/**',
+      './node_modules/strtok3/**',
+      './node_modules/token-types/**',
+      './node_modules/@tokenizer/**',
+      './node_modules/@borewit/**',
+      './node_modules/uint8array-extras/**',
+      './node_modules/ieee754/**',
+      './node_modules/debug/**',
+      './node_modules/ms/**',
+    ],
+  },
   images: { unoptimized: true }, // thumbnails come from our own API
   poweredByHeader: false,
   async headers() {
