@@ -97,8 +97,10 @@ test('6/7/8 · uploads: photo, HEVC video (MP4 preview, seekable), wrong type re
   await expect(page.locator('.up-item .err')).toContainText("isn't a photo or video we can store");
   await expect(page.locator('.panel .mcard')).toHaveCount(2, { timeout: 60_000 });
   await page.locator('.panel .mcard', { hasText: 'clip-hevc.mov' }).locator('.tb').click();
+  // While the HEVC clip is converted the preview says so; then the MP4 player appears by itself.
   const v = page.locator('.preview video');
-  await expect(v).toBeVisible();
+  await expect(v.or(page.locator('.pv-wait'))).toBeVisible();
+  await expect(v).toBeVisible({ timeout: 60_000 });
   const r = await v.evaluate(async (el: HTMLVideoElement) => {
     el.muted = true;
     await new Promise((ok) => (el.readyState >= 1 ? ok(null) : el.addEventListener('loadedmetadata', () => ok(null), { once: true })));
@@ -312,6 +314,7 @@ test('opens filtered to In progress + TBD; All shows every row', async ({ page }
   const statuses = await page.locator('table.sheet tbody tr td:nth-of-type(4)').allInnerTexts();
   expect(statuses.length).toBeGreaterThan(0);
   for (const t of statuses) expect(['In progress', 'TBD']).toContain(t.trim());
+  await expect(page.locator('.table-foot')).toContainText(new RegExp(`Showing ${statuses.length} of \\d+ rows · sheet rows? \\d+`));
   await page.click('.toolbar .fchip:has-text("All")');
   await expect(page).toHaveURL(/status=all/);
   await expect.poll(() => page.locator('table.sheet tbody tr').count()).toBeGreaterThan(statuses.length);

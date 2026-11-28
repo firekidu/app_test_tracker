@@ -909,7 +909,9 @@ function SheetTable({
       </div>
       <div className="table-foot">
         <span>
-          {rows.length ? `Showing rows ${a}–${b} of ${data.stats.total}${rows.length !== data.stats.total ? ` (${rows.length} match)` : ''}` : `0 of ${data.stats.total} rows`} · same columns and order as the original sheet, plus Media
+          {rows.length
+            ? `Showing ${rows.length} of ${data.stats.total} ${data.stats.total === 1 ? 'row' : 'rows'} · sheet ${a === b ? `row ${a}` : `rows ${a}–${b}`}`
+            : `Showing 0 of ${data.stats.total} ${data.stats.total === 1 ? 'row' : 'rows'}`} · same columns and order as the original sheet, plus Media
         </span>
         <span>{data.sync.mode === 'google' ? 'Edits here write back to Sheet1 · files are stored in Google Drive' : 'Saved in the tracker database · files are stored on the server'}</span>
       </div>

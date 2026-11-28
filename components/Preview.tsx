@@ -1,5 +1,5 @@
 'use client';
-import { ChevronLeft, ChevronRight, Download, ExternalLink, Image as ImageIcon, Maximize, Pause, Play, Trash2, Video, Volume2, VolumeX, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, ExternalLink, Image as ImageIcon, Loader2, Maximize, Pause, Play, Trash2, Video, Volume2, VolumeX, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { MediaSummary, Row } from '@/lib/types';
 import { fmtBytes, fmtDuration, prettyDate, trapTab } from './ui';
@@ -194,7 +194,15 @@ export default function Preview({
             <ChevronLeft />
           </button>
         )}
-        {m.kind === 'video' ? (
+        {m.kind === 'video' && m.status === 'processing' ? (
+          // The original (often HEVC from iPhones) does not play in most browsers; wait for the MP4 preview.
+          <div className="pv-wait" role="status">
+            {m.hasThumb && <img src={`/api/media/${m.fileId}/thumb`} alt="" />}
+            <p>
+              <Loader2 className="icon spin" /> Preparing the video for playback… It will play here in a moment.
+            </p>
+          </div>
+        ) : m.kind === 'video' ? (
           <VideoPlayer key={m.fileId} m={m} />
         ) : (
            
