@@ -139,7 +139,7 @@ export default function RowPanel({
             </span>
             <span>
               Change owner:{' '}
-              <NamePicker label="Change owner" value={row.owner} raw={row.ownerRaw} known={row.ownerKnown} people={people} meName={meName} allowNone emptyText="No owner" disabled={!canEdit} busy={busy[`${row.rowNumber}:owner`]} onChoose={(n) => onEdit(row, { owner: n })} />
+              <NamePicker label="Change owner" value={row.owner} raw={row.ownerRaw} known={row.ownerKnown} people={people} meName={meName} allowNone emptyText="No owner" placeholder="+ Add owner" disabled={!canEdit} busy={busy[`${row.rowNumber}:owner`]} onChoose={(n) => onEdit(row, { owner: n })} />
             </span>
             {row.endDate && <span>End date: {row.endDate}</span>}
             {row.milestone && <span>Milestone: {row.milestone}</span>}

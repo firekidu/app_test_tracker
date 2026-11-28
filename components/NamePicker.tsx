@@ -92,6 +92,7 @@ export function NamePicker({
   label,
   busy,
   emptyText = '',
+  placeholder = '',
   inline = true,
 }: {
   value: string;
@@ -106,6 +107,8 @@ export function NamePicker({
   label: string;
   busy?: boolean;
   emptyText?: string;
+  /** Shown (instead of emptyText) when the value is blank and the picker is editable, so the empty cell is easy to click. */
+  placeholder?: string;
   inline?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -171,7 +174,7 @@ export function NamePicker({
       <button
         type="button"
         ref={btn}
-        className={inline ? 'name-btn' : 'input'}
+        className={inline ? `name-btn${!value && placeholder ? ' empty' : ''}` : 'input'}
         style={inline ? undefined : { textAlign: 'left', cursor: 'pointer' }}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -180,7 +183,7 @@ export function NamePicker({
         disabled={busy}
       >
         {busy ? <Loader2 className="icon spin" /> : null}
-        <span className={value ? '' : 'muted'}>{display || ' '}</span>
+        <span className={value ? '' : 'muted'}>{(!value && placeholder) || display || ' '}</span>
         {!known && raw && <span className="not-in-people">not in People</span>}
       </button>
       {open && (

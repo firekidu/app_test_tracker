@@ -49,6 +49,10 @@ import {
   useToast,
 } from './ui';
 
+/** Status filter applied when the URL has none: In progress + TBD. */
+const DEFAULT_STATUS = 'active';
+const ACTIVE_STATUSES = ['In progress', 'TBD'];
+
 type Filters = { status: string; owner: string; priority: string; q: string; newest: boolean; row: number | null; media: string | null };
 
 function readUrl(): Filters {
@@ -165,7 +169,7 @@ function Tracker() {
   const me = data?.me;
   const canEdit = me?.role === 'editor' || me?.role === 'admin';
   const isAdmin = me?.role === 'admin';
-  const effectiveStatus = f.status || (isPhone ? 'open' : 'all');
+  const effectiveStatus = f.status || DEFAULT_STATUS;
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -173,8 +177,9 @@ function Tracker() {
     const q = f.q.trim().toLowerCase();
     let r = data.rows.filter((x) => {
       if (effectiveStatus === 'open' && !openStatuses.includes(x.status)) return false;
+      if (effectiveStatus === 'active' && !ACTIVE_STATUSES.includes(x.status)) return false;
       if (effectiveStatus === 'Other' && STATUS_ORDER.includes(x.status)) return false;
-      if (!['all', 'open', 'Other'].includes(effectiveStatus) && x.status !== effectiveStatus) return false;
+      if (!['all', 'open', 'active', 'Other'].includes(effectiveStatus) && x.status !== effectiveStatus) return false;
       if (f.priority && x.priority !== f.priority) return false;
       if (f.owner === '-' && x.ownerRaw.trim()) return false;
       if (f.owner && f.owner !== '-' && x.owner !== f.owner) return false;
@@ -386,7 +391,7 @@ function Tracker() {
             setAddOpen(false);
             toast(`Row ${n} added${files.length ? ` – uploading ${files.length} file${files.length > 1 ? 's' : ''}` : ''}.`);
             if (files.length) uploads.addFiles({ rowNumber: n, rowKey }, files);
-            update({ status: '', owner: '', priority: '', q: '' });
+            update({ status: 'all', owner: '', priority: '', q: '' });
             await refresh(true);
             setHighlight(n);
             if (files.length) update({ row: n, media: null }, true);
@@ -637,6 +642,7 @@ function ProgressCards({ data, status, setStatus }: { data: SheetPayload; status
 
 // ---------------- toolbar ----------------
 const CHIP_LIST: { v: string; label: string }[] = [
+  { v: 'active', label: 'In progress + TBD' },
   { v: 'all', label: 'All' },
   { v: 'Completed', label: 'Completed' },
   { v: 'In progress', label: 'In progress' },
@@ -649,6 +655,7 @@ const CHIP_LIST: { v: string; label: string }[] = [
 function chipCount(data: SheetPayload, v: string) {
   if (v === 'all') return data.stats.total;
   if (v === 'open') return data.stats.open;
+  if (v === 'active') return ACTIVE_STATUSES.reduce((a, k) => a + (data.stats.byStatus[k] ?? 0), 0);
   if (v === 'Other') return data.stats.other;
   return data.stats.byStatus[v] ?? 0;
 }
@@ -665,7 +672,7 @@ function Toolbar({ data, f, status, update, peopleNames }: { data: SheetPayload;
     <div className="toolbar">
       <div className="chips" role="group" aria-label="Status filter">
         {chips.map((c) => (
-          <button type="button" key={c.v} className={`fchip${status === c.v ? ' on' : ''}`} aria-pressed={status === c.v} onClick={() => update({ status: c.v === 'all' ? '' : c.v })}>
+          <button type="button" key={c.v} className={`fchip${status === c.v ? ' on' : ''}`} aria-pressed={status === c.v} onClick={() => update({ status: c.v === DEFAULT_STATUS ? '' : c.v })}>
             {c.label} <span className="n">{chipCount(data, c.v)}</span>
           </button>
         ))}
@@ -861,7 +868,7 @@ function SheetTable({
                   <ChipSelect label={`Row ${r.rowNumber} priority`} value={r.priority} options={PRIORITIES} disabled={!canEdit} busy={busy[`${r.rowNumber}:priority`]} onChange={(v) => onEdit(r, { priority: v })} render={(v, o) => <PriorityChip priority={v} caret={o.caret} busy={o.busy} />} />
                 </td>
                 <td title={tip(r, 'Reported By')}>
-                  <NamePicker label={`Row ${r.rowNumber} Reported By`} value={r.reporter} raw={r.reporterRaw} known={r.reporterKnown} people={data.people} meName={data.me.name} disabled={!canEdit} busy={busy[`${r.rowNumber}:reporter`]} onChoose={(n) => onEdit(r, { reporter: n })} />
+                  <NamePicker label={`Row ${r.rowNumber} Reported By`} value={r.reporter} raw={r.reporterRaw} known={r.reporterKnown} people={data.people} meName={data.me.name} placeholder="+ Add name" disabled={!canEdit} busy={busy[`${r.rowNumber}:reporter`]} onChoose={(n) => onEdit(r, { reporter: n })} />
                 </td>
                 <td title={tip(r, 'Status')}>
                   <ChipSelect label={`Row ${r.rowNumber} status`} value={r.status} options={STATUS_EDIT_ORDER} disabled={!canEdit} busy={busy[`${r.rowNumber}:status`]} onChange={(v) => onEdit(r, { status: v })} render={(v, o) => <StatusChip status={v} caret={o.caret} busy={o.busy} />} />
@@ -870,7 +877,7 @@ function SheetTable({
                 <EditableCell kind="date" value={r.endDate} label={`Row ${r.rowNumber} End date`} disabled={!textEdit} busy={busy[`${r.rowNumber}:endDate`]} title={tip(r, 'End date')} onSave={(v) => onEdit(r, { endDate: v })} />
                 <EditableCell kind="text" value={r.milestone} label={`Row ${r.rowNumber} Milestone`} disabled={!textEdit} busy={busy[`${r.rowNumber}:milestone`]} title={tip(r, 'Milestone')} onSave={(v) => onEdit(r, { milestone: v })} />
                 <td title={tip(r, 'Change owner')}>
-                  <NamePicker label={`Row ${r.rowNumber} Change owner`} value={r.owner} raw={r.ownerRaw} known={r.ownerKnown} people={data.people} meName={data.me.name} allowNone disabled={!canEdit} busy={busy[`${r.rowNumber}:owner`]} onChoose={(n) => onEdit(r, { owner: n })} />
+                  <NamePicker label={`Row ${r.rowNumber} Change owner`} value={r.owner} raw={r.ownerRaw} known={r.ownerKnown} people={data.people} meName={data.me.name} allowNone placeholder="+ Add owner" disabled={!canEdit} busy={busy[`${r.rowNumber}:owner`]} onChoose={(n) => onEdit(r, { owner: n })} />
                 </td>
                 <EditableCell kind="text" value={r.deliverable} label={`Row ${r.rowNumber} Deliverable`} disabled={!textEdit} busy={busy[`${r.rowNumber}:deliverable`]} title={tip(r, 'Deliverable')} onSave={(v) => onEdit(r, { deliverable: v })} />
                 <EditableCell kind="long" className="notes" value={r.notes} label={`Row ${r.rowNumber} Notes`} disabled={!textEdit} busy={busy[`${r.rowNumber}:notes`]} title={tip(r, 'Notes') ?? r.notes} onSave={(v) => onEdit(r, { notes: v })} />

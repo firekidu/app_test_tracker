@@ -23,6 +23,8 @@ async function signIn(page: Page, u: string, p: string) {
   const res = page.waitForResponse((r) => r.url().includes('/api/auth/sign-in/username'));
   await page.click('button[type=submit]');
   if ((await res).ok()) await page.waitForURL((u) => !u.pathname.startsWith('/login'));
+  // The tracker opens filtered to In progress + TBD; most tests work on every row.
+  if (new URL(page.url()).pathname === '/') await page.goto('/?status=all');
 }
 
 test('1 · start-up admin must change password; wrong password message', async ({ page }) => {
@@ -39,6 +41,8 @@ test('1 · start-up admin must change password; wrong password message', async (
   await page.fill('#pw2', NEWPW);
   await page.click('button[type=submit]');
   await page.waitForURL('**/?pw=changed');
+  await expect(page.locator('.toolbar .fchip.on')).toContainText('In progress + TBD');
+  await page.click('.toolbar .fchip:has-text("All")');
   await expect(page.locator('table.sheet tbody tr')).toHaveCount(86);
   await expect(page.locator('.cards .card').first()).toContainText('77%');
   await expect(page.locator('.cards .card').first()).toContainText('66 of 86 completed');
@@ -115,11 +119,12 @@ test('10 · delete moves the file to trash and logs it', async ({ page }) => {
   await expect(page.locator('.panel .history')).toContainText('Media deleted');
 });
 
-test('11 · phone layout: cards, Open by default, camera tile', async ({ browser }) => {
+test('11 · phone layout: cards, In progress + TBD by default, camera tile', async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
   await signIn(page, ADMIN, NEWPW);
-  await expect(page.locator('.fchip.on')).toContainText('Open');
+  await page.goto('/');
+  await expect(page.locator('.fchip.on')).toContainText('In progress + TBD');
   await expect(page.locator('.rcard').first()).toBeVisible();
   await expect(page.locator('.rcard .add-tile').first()).toBeVisible();
   await ctx.close();
@@ -158,6 +163,7 @@ test('export CSV and import (append) from Admin → Data', async ({ page }) => {
   await signIn(page, ADMIN, NEWPW);
   const res = await page.request.get('/api/export');
   expect(res.status()).toBe(200);
+  expect(res.headers()['content-disposition']).toMatch(/filename="EPM-DEV-TRACKER-\d{4}-\d{2}-\d{2}\.csv"/);
   const csv = await res.text();
   expect(csv.split('\n')[0]).toContain('Change Request,Priority,Reported By,Status');
   expect(csv.trim().split('\n').length).toBe(87);
@@ -167,7 +173,7 @@ test('export CSV and import (append) from Admin → Data', async ({ page }) => {
   await page.setInputFiles('input[aria-label="CSV file"]', file);
   await page.click('section[aria-labelledby=d-h] button:has-text("Import")');
   await expect(page.locator('.toast').first()).toContainText('Imported 1 rows (now 87)');
-  await page.goto('/');
+  await page.goto('/?status=all');
   await expect(page.locator('table.sheet tbody tr')).toHaveCount(87);
   await expect(page.locator('tr[data-row="88"]')).toContainText('Imported bug one');
   await expect(page.locator('tr[data-row="88"]')).toContainText('Priya S');
@@ -220,7 +226,7 @@ test('column header filters', async ({ page }) => {
   await expect(page.locator('table.sheet tbody tr')).toHaveCount(87);
   await page.click('button[aria-label="Filter column Change owner"]');
   await page.selectOption('select[aria-label="Filter Change owner"]', '-');
-  for (const t of await page.locator('table.sheet tbody tr td:nth-of-type(8)').allInnerTexts()) expect(t.trim()).toBe('');
+  for (const t of await page.locator('table.sheet tbody tr td:nth-of-type(8)').allInnerTexts()) expect(t.trim()).toBe('+ Add owner');
 });
 
 test('delete a row: confirmation, rows move up, logged in the Activity log', async ({ page }) => {
@@ -297,4 +303,28 @@ test('reset password popup stays open until Close; own account cannot be reset',
   await expect(page).toHaveURL(/\/admin/);
   await page.click('.dialog button:has-text("Close")');
   await expect(page.locator('.secret-box')).toHaveCount(0);
+});
+
+test('opens filtered to In progress + TBD; All shows every row', async ({ page }) => {
+  await signIn(page, ADMIN, NEWPW);
+  await page.goto('/');
+  await expect(page.locator('.toolbar .fchip.on')).toContainText('In progress + TBD');
+  const statuses = await page.locator('table.sheet tbody tr td:nth-of-type(4)').allInnerTexts();
+  expect(statuses.length).toBeGreaterThan(0);
+  for (const t of statuses) expect(['In progress', 'TBD']).toContain(t.trim());
+  await page.click('.toolbar .fchip:has-text("All")');
+  await expect(page).toHaveURL(/status=all/);
+  await expect.poll(() => page.locator('table.sheet tbody tr').count()).toBeGreaterThan(statuses.length);
+});
+
+test('blank Change owner cell has a clickable "+ Add owner" button', async ({ page }) => {
+  await signIn(page, ADMIN, NEWPW);
+  const btn = page.locator('button[aria-label$="Change owner: none. Change"]').first();
+  await expect(btn).toContainText('+ Add owner');
+  const box = await btn.boundingBox();
+  expect(box!.width).toBeGreaterThan(40);
+  const row = await btn.locator('xpath=ancestor::tr').getAttribute('data-row');
+  await btn.click();
+  await page.locator('.dd-pop [role=option]').nth(1).click();
+  await expect(page.locator(`tr[data-row="${row}"] button[aria-label$="Change owner: none. Change"]`)).toHaveCount(0);
 });

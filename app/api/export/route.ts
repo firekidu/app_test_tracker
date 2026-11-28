@@ -12,7 +12,7 @@ export async function GET(req: Request) {
     return new Response(csv, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="smprd-error-log-${todayIso()}.csv"`,
+        'Content-Disposition': `attachment; filename="EPM-DEV-TRACKER-${todayIso()}.csv"`,
         'Cache-Control': 'no-store',
       },
     });
