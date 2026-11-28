@@ -141,6 +141,8 @@ set_kv APP_DOMAIN "$APP_DOMAIN"
 set_kv VPS_IP "${VPS_IP:-127.0.0.1}"
 set_kv APP_URL "https://$APP_DOMAIN"
 set_kv BETTER_AUTH_URL "https://$APP_DOMAIN"
+# Compose runs under sudo, which drops exported variables: keep the release id in the env file it reads.
+set_kv APP_VERSION "$APP_VERSION"
 [ -n "${GOOGLE_CLIENT_ID:-}" ] && set_kv GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID"
 [ -n "${GOOGLE_CLIENT_SECRET:-}" ] && set_kv GOOGLE_CLIENT_SECRET "$GOOGLE_CLIENT_SECRET"
 
