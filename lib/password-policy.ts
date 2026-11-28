@@ -3,6 +3,8 @@ import { COMMON_PASSWORDS } from './common-passwords';
 
 const COMMON = new Set(COMMON_PASSWORDS);
 const MAX = 128;
+/** Lowest password length the tracker accepts (PASSWORD_MIN_LENGTH can only raise it). */
+export const MIN_PASSWORD_LENGTH = 6;
 
 export interface PolicyInput {
   password: string;
@@ -44,7 +46,7 @@ function isRunOrSequence(p: string): boolean {
 /** Returns a plain-words problem, or null when the password is acceptable. */
 export function checkPassword({ password, username, displayName, minLength }: PolicyInput): string | null {
   const len = charCount(password);
-  const min = Math.max(15, minLength);
+  const min = Math.max(MIN_PASSWORD_LENGTH, minLength);
   if (len < min) return `Use at least ${min} characters – a short sentence works well.`;
   if (len > MAX) return `Use at most ${MAX} characters.`;
   const lower = password.toLowerCase().trim();

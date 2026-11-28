@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { checkPassword } from '@/lib/password-policy';
 
-const ok = (password: string, extra: { username?: string; displayName?: string } = {}) => checkPassword({ password, minLength: 15, ...extra });
+const ok = (password: string, extra: { username?: string; displayName?: string } = {}) => checkPassword({ password, minLength: 6, ...extra });
 
 describe('password policy (5.12)', () => {
-  it('needs 15 characters', () => {
-    expect(ok('tiger lamp rive')).toBeNull(); // 15 chars
-    expect(ok('tiger lamp riv')).toMatch(/at least 15/); // 14 chars
-    expect(ok('tiger lamp river')).toBeNull(); // 16 chars
-    expect(ok('blue kettle sun')).toBeNull(); // exactly 15
+  it('needs 6 characters', () => {
+    expect(ok('tiger7')).toBeNull(); // 6 chars
+    expect(ok('tiger')).toMatch(/at least 6/); // 5 chars
+    expect(ok('tiger lamp river')).toBeNull();
   });
-  it('never allows a minimum below 15', () => {
-    expect(checkPassword({ password: 'short but 14ch', minLength: 8 })).toMatch(/at least 15/);
+  it('never allows a minimum below 6, but a higher setting still applies', () => {
+    expect(checkPassword({ password: 'abc', minLength: 2 })).toMatch(/at least 6/);
+    expect(checkPassword({ password: 'tiger lamp', minLength: 12 })).toMatch(/at least 12/);
   });
   it('rejects repeated and sequential runs', () => {
     expect(ok('aaaaaaaaaaaaaaa')).not.toBeNull();
@@ -32,8 +32,8 @@ describe('password policy (5.12)', () => {
     expect(ok('all lower case words here')).toBeNull();
   });
   it('counts emoji once', () => {
-    expect(ok('🍕🍕🍕🍕🍕🍕🍕 abcdefg')).toBeNull(); // 15 graphemes
-    expect(ok('🍕🍕🍕🍕🍕🍕 abcdefg')).toMatch(/at least 15/); // 14
+    expect(ok('🍕🍕🍕 ab')).toBeNull(); // 6 graphemes
+    expect(ok('🍕🍕🍕 a')).toMatch(/at least 6/); // 5
   });
   it('caps at 128', () => {
     expect(ok('word '.repeat(30))).toMatch(/at most/);

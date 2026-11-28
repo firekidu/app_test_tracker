@@ -33,10 +33,10 @@ test('1 · start-up admin must change password; wrong password message', async (
   await signIn(page, ADMIN, TEMP);
   await page.waitForURL('**/account/password');
   await page.fill('#cur', TEMP);
-  await page.fill('#pw', 'only fourteen!');
-  await page.fill('#pw2', 'only fourteen!');
+  await page.fill('#pw', 'tiger');
+  await page.fill('#pw2', 'tiger');
   await page.click('button[type=submit]');
-  await expect(page.locator('.form-error')).toContainText('at least 15');
+  await expect(page.locator('.form-error')).toContainText('at least 6');
   await page.fill('#pw', NEWPW);
   await page.fill('#pw2', NEWPW);
   await page.click('button[type=submit]');
@@ -363,4 +363,30 @@ test('dropdowns are not cut off when only a few rows are shown', async ({ page }
   });
   expect(box!.height).toBeGreaterThan(20);
   expect(hit).toBe(true);
+});
+
+test('a 6-character password is accepted and works for sign-in', async ({ page, browser }) => {
+  await signIn(page, ADMIN, NEWPW);
+  await page.goto('/admin');
+  await page.click('button:has-text("Add user")');
+  await page.fill('#nu-u', 'short.pw');
+  await page.fill('#nu-d', 'Short Pw');
+  await page.click('.dialog button:has-text("Create account")');
+  const temp = (await page.textContent('.secret-box code'))!.trim();
+  const ctx = await browser.newContext();
+  const p2 = await ctx.newPage();
+  await signIn(p2, 'short.pw', temp);
+  await p2.waitForURL('**/account/password');
+  await expect(p2.locator('.hint, p, span').filter({ hasText: 'At least 6 characters' }).first()).toBeVisible();
+  await p2.fill('#cur', temp);
+  await p2.fill('#pw', 'kiwi42');
+  await p2.fill('#pw2', 'kiwi42');
+  await p2.click('button[type=submit]');
+  await p2.waitForURL('**/?pw=changed');
+  await ctx.close();
+  const ctx2 = await browser.newContext();
+  const p3 = await ctx2.newPage();
+  await signIn(p3, 'short.pw', 'kiwi42');
+  await expect(p3.locator('table.sheet')).toBeVisible();
+  await ctx2.close();
 });

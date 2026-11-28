@@ -105,7 +105,7 @@ if ! as_root test -f "$ENVF"; then
     echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)"
     echo "ENCRYPTION_KEY=$(openssl rand -base64 32)"
     echo "INITIAL_ADMIN_USERNAME=${ADMIN_USERNAME:-david}"
-    echo "PASSWORD_MIN_LENGTH=15"
+    echo "PASSWORD_MIN_LENGTH=6"
     echo "PWNED_CHECK=false"
     echo "LOCKOUT_ATTEMPTS=5"
     echo "LOCKOUT_MINUTES=15"
@@ -141,6 +141,8 @@ set_kv APP_DOMAIN "$APP_DOMAIN"
 set_kv VPS_IP "${VPS_IP:-127.0.0.1}"
 set_kv APP_URL "https://$APP_DOMAIN"
 set_kv BETTER_AUTH_URL "https://$APP_DOMAIN"
+# Minimum password length went from 15 to 6 (Nov 2026): move servers still on the old default.
+if as_root grep -qx "PASSWORD_MIN_LENGTH=15" "$ENVF"; then set_kv PASSWORD_MIN_LENGTH 6; fi
 # Compose runs under sudo, which drops exported variables: keep the release id in the env file it reads.
 set_kv APP_VERSION "$APP_VERSION"
 [ -n "${GOOGLE_CLIENT_ID:-}" ] && set_kv GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID"

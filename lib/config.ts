@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MIN_PASSWORD_LENGTH } from './password-policy';
 
 const bool = (d: boolean) =>
   z
@@ -21,7 +22,7 @@ const schema = z.object({
   ENCRYPTION_KEY: z.string().default(''),
   INITIAL_ADMIN_USERNAME: z.string().default('admin'),
   INITIAL_ADMIN_PASSWORD: z.string().default(''),
-  PASSWORD_MIN_LENGTH: int(15).transform((n) => Math.max(15, n)),
+  PASSWORD_MIN_LENGTH: int(MIN_PASSWORD_LENGTH).transform((n) => Math.max(MIN_PASSWORD_LENGTH, n)),
   PWNED_CHECK: bool(false),
   LOCKOUT_ATTEMPTS: int(5),
   LOCKOUT_MINUTES: int(15),

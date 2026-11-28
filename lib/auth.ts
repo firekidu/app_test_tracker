@@ -6,6 +6,7 @@ import { createAccessControl } from 'better-auth/plugins/access';
 import { adminAc, defaultStatements, userAc } from 'better-auth/plugins/admin/access';
 import { config } from './config';
 import { db } from './db';
+import { MIN_PASSWORD_LENGTH } from './password-policy';
 
 export const USERNAME_RE = /^[a-z0-9._-]{3,30}$/;
 export const normalizeUsername = (u: string) => String(u ?? '').trim().toLowerCase();
@@ -29,7 +30,7 @@ function createAuth() {
       enabled: true,
       disableSignUp: true,
       autoSignIn: false,
-      minPasswordLength: Math.max(15, c.PASSWORD_MIN_LENGTH),
+      minPasswordLength: Math.max(MIN_PASSWORD_LENGTH, c.PASSWORD_MIN_LENGTH),
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
     },
