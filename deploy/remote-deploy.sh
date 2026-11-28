@@ -90,7 +90,8 @@ export APP_VERSION="${APP_VERSION:-unknown}"
 log "Release: $APP_VERSION"
 # GitHub's own archives wrap everything in one top-level folder; strip it when there is no Dockerfile at the root.
 STRIP=0
-if ! tar -tzf "$SRC_TGZ" | grep -qx 'Dockerfile'; then STRIP=1; fi
+# (No grep -q here: it exits early, tar gets SIGPIPE and pipefail would make the test lie.)
+if ! tar -tzf "$SRC_TGZ" | grep -x 'Dockerfile' >/dev/null; then STRIP=1; fi
 as_root tar -xzf "$SRC_TGZ" -C "$BASE/src.new" --strip-components="$STRIP"
 rm -f "$SRC_TGZ"
 
